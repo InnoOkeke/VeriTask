@@ -16,6 +16,7 @@ export default function AgentBoard() {
     const stored = loadTasks().filter(
       (t) => t.status === "open" || t.status === "claimed"
     );
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTasks(stored);
     setLoading(false);
   }, []);

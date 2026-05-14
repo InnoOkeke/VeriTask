@@ -1,6 +1,6 @@
 "use client";
 
-import { signTransaction } from "@stellar/freighter-api";
+import { useWallet } from "@/components/WalletProvider";
 import {
   useInitializeEscrow,
   useFundEscrow,
@@ -21,6 +21,7 @@ import type {
 } from "@trustless-work/escrow";
 
 export function useEscrowService() {
+  const { signXdr } = useWallet();
   const { deployEscrow } = useInitializeEscrow();
   const { fundEscrow } = useFundEscrow();
   const { approveMilestone } = useApproveMilestone();
@@ -30,11 +31,8 @@ export function useEscrowService() {
   const { getEscrowsBySigner } = useGetEscrowsFromIndexerBySigner();
 
   const signAndSend = async (unsignedXdr: string) => {
-    const result = await signTransaction(unsignedXdr, {
-      networkPassphrase: "Test SDF Network ; September 2015",
-    });
-    if (result.error) throw new Error(String(result.error));
-    return sendTransaction(result.signedTxXdr);
+    const signed = await signXdr(unsignedXdr);
+    return sendTransaction(signed);
   };
 
   return {

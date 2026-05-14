@@ -19,6 +19,7 @@ export default function EmployerDashboard() {
     const stored = loadTasks().filter(
       (t) => t.employerAddress === publicKey
     );
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTasks(stored);
     setLoading(false);
   }, [publicKey]);

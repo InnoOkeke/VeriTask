@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useWallet } from "@/components/WalletProvider";
 
 export default function Home() {
-  const { connected, connect } = useWallet();
+  const { connected, openWalletModal } = useWallet();
 
   return (
     <div className="flex flex-col">
@@ -50,10 +50,10 @@ export default function Home() {
               </>
             ) : (
               <button
-                onClick={connect}
+                onClick={openWalletModal}
                 className="w-full sm:w-auto px-8 py-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-semibold transition-colors"
               >
-                Connect Freighter Wallet to Start
+                Connect Wallet to Start
               </button>
             )}
           </div>
