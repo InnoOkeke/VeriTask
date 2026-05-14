@@ -1,28 +1,73 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { createContext, useContext, useState, useCallback } from "react";
 import type { ReactNode } from "react";
+import {
+  isConnected as freighterIsConnected,
+  requestAccess,
+  getAddress as freighterGetAddress,
+  signTransaction as freighterSign,
+} from "@stellar/freighter-api";
 
-export type WalletType = string;
+export type WalletType = "freighter" | "albedo" | "xbull" | "rabet" | "lobstr";
 
-interface ISupportedWallet {
-  id: string;
-  name: string;
-  type: string;
-  isAvailable: boolean;
-  isPlatformWrapper: boolean;
-  icon: string;
-  url: string;
+const WALLET_META: Record<WalletType, { name: string }> = {
+  freighter: { name: "Freighter" },
+  albedo:  { name: "Albedo" },
+  xbull:   { name: "xBull" },
+  rabet:   { name: "Rabet" },
+  lobstr:  { name: "LOBSTR" },
+};
+
+export function getWalletName(type: WalletType): string {
+  return WALLET_META[type]?.name || type;
 }
 
+// --------------- Albedo helpers ---------------
+function albedoPopup(url: string): Promise<MessageEvent> {
+  return new Promise((resolve, reject) => {
+    const popup = window.open(url, "albedo", "width=440,height=640");
+    if (!popup) return reject(new Error("Popup blocked. Allow popups for this site."));
+
+    const handler = (e: MessageEvent) => {
+      if (e.origin !== "https://albedo.link") return;
+      window.removeEventListener("message", handler);
+      popup.close();
+      resolve(e);
+    };
+    window.addEventListener("message", handler);
+
+    setTimeout(() => {
+      window.removeEventListener("message", handler);
+      popup.close();
+      reject(new Error("Albedo timed out"));
+    }, 120000);
+  });
+}
+
+async function albedoConnect(): Promise<string> {
+  const event = await albedoPopup("https://albedo.link/authenticate");
+  if (event.data?.pubkey) return event.data.pubkey;
+  throw new Error(event.data?.error || "Albedo connection failed");
+}
+
+async function albedoSign(xdr: string, pubkey: string): Promise<string> {
+  const encoded = encodeURIComponent(xdr);
+  const event = await albedoPopup(
+    `https://albedo.link/sign?xdr=${encoded}&pubkey=${pubkey}&network=testnet`
+  );
+  if (event.data?.signed_envelope_xdr) return event.data.signed_envelope_xdr;
+  throw new Error(event.data?.error || "Albedo signing failed");
+}
+
+// --------------- Context ---------------
 interface WalletState {
   connected: boolean;
   publicKey: string | null;
   walletType: WalletType | null;
-  connect: () => Promise<void>;
+  connect: (type: WalletType) => Promise<void>;
   disconnect: () => void;
   signXdr: (xdr: string, networkPassphrase?: string) => Promise<string>;
-  availableWallets: ISupportedWallet[];
 }
 
 const WalletContext = createContext<WalletState>({
@@ -32,92 +77,47 @@ const WalletContext = createContext<WalletState>({
   connect: async () => {},
   disconnect: () => {},
   signXdr: async () => "",
-  availableWallets: [],
 });
-
-// Lazy-loaded references to avoid Turbopack sub-path resolution issues
-let StellarWalletsKitModule: typeof import("@creit.tech/stellar-wallets-kit") | null = null;
-
-async function loadWalletKit() {
-  if (StellarWalletsKitModule) return StellarWalletsKitModule;
-  StellarWalletsKitModule = await import("@creit.tech/stellar-wallets-kit");
-  return StellarWalletsKitModule;
-}
-
-async function loadDefaultModules(): Promise<unknown[]> {
-  const mod = await import("@creit.tech/stellar-wallets-kit/modules/utils");
-  return (mod as { defaultModules: (opts?: { filterBy?: (m: unknown) => boolean }) => unknown[] }).defaultModules();
-}
 
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
   const [walletType, setWalletType] = useState<WalletType | null>(null);
-  const [availableWallets, setAvailableWallets] = useState<ISupportedWallet[]>([]);
-  const [initialized, setInitialized] = useState(false);
 
-  useEffect(() => {
-    if (initialized) return;
-
-    (async () => {
-      try {
-        const kit = await loadWalletKit();
-        const modules = await loadDefaultModules();
-
-        kit.StellarWalletsKit.init({
-          modules: modules as Parameters<typeof kit.StellarWalletsKit.init>[0]["modules"],
-        });
-
-        const wallets = await kit.StellarWalletsKit.refreshSupportedWallets();
-        setAvailableWallets(
-          wallets.filter((w: ISupportedWallet) => w.isAvailable !== false)
-        );
-
-        kit.StellarWalletsKit.on(kit.KitEventType.STATE_UPDATED, (event) => {
-          if (event.payload.address) {
-            setPublicKey(event.payload.address);
-            setConnected(true);
-            setWalletType(kit.StellarWalletsKit.selectedModule?.productName || null);
-          }
-        });
-
-        kit.StellarWalletsKit.on(kit.KitEventType.DISCONNECT, () => {
-          setPublicKey(null);
-          setConnected(false);
-          setWalletType(null);
-        });
-
-        setInitialized(true);
-      } catch {
-        setInitialized(true);
-      }
-    })();
-  }, [initialized]);
-
-  const connect = useCallback(async () => {
-    const kit = await loadWalletKit();
+  const connect = useCallback(async (type: WalletType) => {
     try {
-      const result = await kit.StellarWalletsKit.authModal();
-      if (result.address) {
-        setPublicKey(result.address);
-        setConnected(true);
-        setWalletType(kit.StellarWalletsKit.selectedModule?.productName || null);
+      let pk = "";
+
+      if (type === "freighter") {
+        const conn = await freighterIsConnected();
+        if (!conn.isConnected) throw new Error("Freighter not installed. Get it at freighter.app");
+        const access = await requestAccess();
+        if (access.error) throw new Error(String(access.error));
+        const addr = await freighterGetAddress();
+        pk = addr.address;
+      } else if (type === "albedo") {
+        pk = await albedoConnect();
+      } else if (type === "xbull") {
+        const conn = await freighterIsConnected();
+        if (!conn.isConnected) throw new Error("xBull not detected. Try Freighter or Albedo.");
+        const access = await requestAccess();
+        if (access.error) throw new Error(String(access.error));
+        const addr = await freighterGetAddress();
+        pk = addr.address;
+      } else {
+        throw new Error(`${getWalletName(type)} integration coming soon. Use Freighter or Albedo.`);
       }
+
+      setPublicKey(pk);
+      setWalletType(type);
+      setConnected(true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (!msg.includes("closed") && !msg.includes("cancel")) {
-        throw new Error(msg);
-      }
+      throw new Error(msg);
     }
   }, []);
 
-  const disconnect = useCallback(async () => {
-    try {
-      const kit = await loadWalletKit();
-      await kit.StellarWalletsKit.disconnect();
-    } catch {
-      // Ignore
-    }
+  const disconnect = useCallback(() => {
     setPublicKey(null);
     setConnected(false);
     setWalletType(null);
@@ -125,30 +125,30 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const signXdr = useCallback(
     async (xdr: string, networkPassphrase?: string): Promise<string> => {
-      if (!connected) throw new Error("Wallet not connected");
-      const kit = await loadWalletKit();
+      if (!connected || !publicKey) throw new Error("Wallet not connected");
       const passphrase = networkPassphrase || "Test SDF Network ; September 2015";
-      const result = await kit.StellarWalletsKit.signTransaction(xdr, {
-        networkPassphrase: passphrase,
-      });
-      if (!result.signedTxXdr) throw new Error("Failed to sign transaction");
-      return result.signedTxXdr;
+
+      if (walletType === "freighter" || walletType === "xbull") {
+        const result = await freighterSign(xdr, {
+          networkPassphrase: passphrase,
+          address: publicKey,
+        });
+        if (result.error) throw new Error(String(result.error));
+        if (!result.signedTxXdr) throw new Error("Signing returned no result");
+        return result.signedTxXdr;
+      }
+
+      if (walletType === "albedo") {
+        return albedoSign(xdr, publicKey);
+      }
+
+      throw new Error(`Signing not supported for ${walletType}`);
     },
-    [connected]
+    [connected, publicKey, walletType]
   );
 
   return (
-    <WalletContext.Provider
-      value={{
-        connected,
-        publicKey,
-        walletType,
-        connect,
-        disconnect,
-        signXdr,
-        availableWallets,
-      }}
-    >
+    <WalletContext.Provider value={{ connected, publicKey, walletType, connect, disconnect, signXdr }}>
       {children}
     </WalletContext.Provider>
   );

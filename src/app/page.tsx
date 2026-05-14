@@ -1,10 +1,35 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { useWallet } from "@/components/WalletProvider";
+import { useWallet, getWalletName } from "@/components/WalletProvider";
+import type { WalletType } from "@/components/WalletProvider";
+
+const WALLETS: { type: WalletType; icon: string; desc: string }[] = [
+  { type: "freighter", icon: "🦊", desc: "Browser extension" },
+  { type: "albedo", icon: "☀️", desc: "Web wallet (popup)" },
+  { type: "xbull", icon: "🐂", desc: "Browser extension" },
+  { type: "rabet", icon: "🐰", desc: "Browser extension" },
+  { type: "lobstr", icon: "🐳", desc: "Mobile & web" },
+];
 
 export default function Home() {
   const { connected, connect } = useWallet();
+  const [showModal, setShowModal] = useState(false);
+  const [connecting, setConnecting] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
+  const handleConnect = async (type: WalletType) => {
+    setError("");
+    setConnecting(type);
+    try {
+      await connect(type);
+      setShowModal(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+    setConnecting(null);
+  };
 
   return (
     <div className="flex flex-col">
@@ -50,7 +75,7 @@ export default function Home() {
               </>
             ) : (
               <button
-                onClick={connect}
+                onClick={() => { setError(""); setShowModal(true); }}
                 className="w-full sm:w-auto px-8 py-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-semibold transition-colors"
               >
                 Connect Wallet to Start
@@ -150,6 +175,46 @@ export default function Home() {
       <footer className="px-4 py-8 border-t border-zinc-800 text-center text-xs text-zinc-600">
         VeriTask — Built for the Boundless × Trustless Work Hackathon
       </footer>
+
+      {showModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowModal(false)} />
+          <div className="relative z-10 w-full max-w-sm mx-4 p-6 rounded-2xl bg-zinc-900 border border-zinc-800 shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-semibold">Connect Wallet</h2>
+              <button onClick={() => setShowModal(false)} className="text-zinc-500 hover:text-white text-xl">×</button>
+            </div>
+
+            {error && (
+              <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs">{error}</div>
+            )}
+
+            <div className="space-y-2">
+              {WALLETS.map(({ type, icon, desc }) => (
+                <button
+                  key={type}
+                  onClick={() => handleConnect(type)}
+                  disabled={!!connecting}
+                  className="w-full flex items-center gap-3 p-4 rounded-xl border border-zinc-700 hover:border-violet-500/50 bg-zinc-800/50 hover:bg-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-left"
+                >
+                  <span className="text-2xl">{icon}</span>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-white">{getWalletName(type)}</p>
+                    <p className="text-xs text-zinc-500">{desc}</p>
+                  </div>
+                  {connecting === type ? (
+                    <span className="w-4 h-4 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <span className="text-zinc-600">→</span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            <p className="text-xs text-zinc-600 text-center mt-4">Select a Stellar wallet to connect</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
