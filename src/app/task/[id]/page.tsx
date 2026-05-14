@@ -7,6 +7,7 @@ import { useWallet } from "@/components/WalletProvider";
 import { RequireWallet } from "@/components/RequireWallet";
 import { getTask, updateMilestone, updateTask } from "@/lib/store";
 import { useEscrowService } from "@/lib/escrowService";
+import { VerificationPanel } from "@/components/VerificationPanel";
 import type { Milestone } from "@/lib/types";
 
 export default function TaskDetailPage({
@@ -254,6 +255,15 @@ export default function TaskDetailPage({
                       <p className="text-sm text-zinc-400">{m.evidence}</p>
                     </div>
                   )}
+
+                  {role === "employer" && m.status === "submitted" && (
+                    <VerificationPanel
+                      milestoneDescription={m.description}
+                      evidence={m.evidence}
+                      onVerified={() => handleApprove(m.id, i)}
+                      disabled={busy}
+                    />
+                  )}
                 </div>
 
                 <div className="flex flex-col items-end gap-2">
@@ -272,15 +282,6 @@ export default function TaskDetailPage({
                   )}
                   {role === "employer" && (
                     <>
-                      {m.status === "submitted" && task.escrowContractId && (
-                        <button
-                          onClick={() => handleApprove(m.id, i)}
-                          disabled={busy}
-                          className="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors whitespace-nowrap disabled:opacity-50"
-                        >
-                          Approve
-                        </button>
-                      )}
                       {m.status === "approved" && task.escrowContractId && (
                         <button
                           onClick={() => handleRelease(m.id, i)}
