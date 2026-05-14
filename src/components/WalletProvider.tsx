@@ -1,13 +1,19 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import type { ReactNode } from "react";
-import { StellarWalletsKit } from "@creit.tech/stellar-wallets-kit/sdk";
-import { defaultModules } from "@creit.tech/stellar-wallets-kit/modules/utils";
-import type { ISupportedWallet } from "@creit.tech/stellar-wallets-kit/types";
-import { KitEventType } from "@creit.tech/stellar-wallets-kit/types";
 
 export type WalletType = string;
+
+interface ISupportedWallet {
+  id: string;
+  name: string;
+  type: string;
+  isAvailable: boolean;
+  isPlatformWrapper: boolean;
+  icon: string;
+  url: string;
+}
 
 interface WalletState {
   connected: boolean;
@@ -17,9 +23,6 @@ interface WalletState {
   disconnect: () => void;
   signXdr: (xdr: string, networkPassphrase?: string) => Promise<string>;
   availableWallets: ISupportedWallet[];
-  showWalletModal: boolean;
-  openWalletModal: () => void;
-  closeWalletModal: () => void;
 }
 
 const WalletContext = createContext<WalletState>({
@@ -30,65 +33,78 @@ const WalletContext = createContext<WalletState>({
   disconnect: () => {},
   signXdr: async () => "",
   availableWallets: [],
-  showWalletModal: false,
-  openWalletModal: () => {},
-  closeWalletModal: () => {},
 });
+
+// Lazy-loaded references to avoid Turbopack sub-path resolution issues
+let StellarWalletsKitModule: typeof import("@creit.tech/stellar-wallets-kit") | null = null;
+
+async function loadWalletKit() {
+  if (StellarWalletsKitModule) return StellarWalletsKitModule;
+  StellarWalletsKitModule = await import("@creit.tech/stellar-wallets-kit");
+  return StellarWalletsKitModule;
+}
+
+async function loadDefaultModules(): Promise<unknown[]> {
+  const mod = await import("@creit.tech/stellar-wallets-kit/modules/utils");
+  return (mod as { defaultModules: (opts?: { filterBy?: (m: unknown) => boolean }) => unknown[] }).defaultModules();
+}
 
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
   const [walletType, setWalletType] = useState<WalletType | null>(null);
   const [availableWallets, setAvailableWallets] = useState<ISupportedWallet[]>([]);
-  const [showWalletModal, setShowWalletModal] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
-  // Initialize the kit once
   useEffect(() => {
     if (initialized) return;
-    try {
-      StellarWalletsKit.init({
-        modules: defaultModules(),
-      });
-      setInitialized(true);
 
-      // Load supported wallets
-      StellarWalletsKit.refreshSupportedWallets().then((wallets) => {
-        setAvailableWallets(wallets.filter((w) => w.isAvailable !== false));
-      });
+    (async () => {
+      try {
+        const kit = await loadWalletKit();
+        const modules = await loadDefaultModules();
 
-      // Listen for state updates
-      StellarWalletsKit.on(KitEventType.STATE_UPDATED, (event) => {
-        if (event.payload.address) {
-          setPublicKey(event.payload.address);
-          setConnected(true);
-        setWalletType(StellarWalletsKit.selectedModule?.productName || null);
-        }
-      });
+        kit.StellarWalletsKit.init({
+          modules: modules as Parameters<typeof kit.StellarWalletsKit.init>[0]["modules"],
+        });
 
-      // Listen for disconnects
-      StellarWalletsKit.on(KitEventType.DISCONNECT, () => {
-        setPublicKey(null);
-        setConnected(false);
-        setWalletType(null);
-      });
-    } catch {
-      setInitialized(true);
-    }
+        const wallets = await kit.StellarWalletsKit.refreshSupportedWallets();
+        setAvailableWallets(
+          wallets.filter((w: ISupportedWallet) => w.isAvailable !== false)
+        );
+
+        kit.StellarWalletsKit.on(kit.KitEventType.STATE_UPDATED, (event) => {
+          if (event.payload.address) {
+            setPublicKey(event.payload.address);
+            setConnected(true);
+            setWalletType(kit.StellarWalletsKit.selectedModule?.productName || null);
+          }
+        });
+
+        kit.StellarWalletsKit.on(kit.KitEventType.DISCONNECT, () => {
+          setPublicKey(null);
+          setConnected(false);
+          setWalletType(null);
+        });
+
+        setInitialized(true);
+      } catch {
+        setInitialized(true);
+      }
+    })();
   }, [initialized]);
 
   const connect = useCallback(async () => {
+    const kit = await loadWalletKit();
     try {
-      const result = await StellarWalletsKit.authModal();
+      const result = await kit.StellarWalletsKit.authModal();
       if (result.address) {
         setPublicKey(result.address);
         setConnected(true);
-        setWalletType(StellarWalletsKit.selectedModule?.productName || null);
-        setShowWalletModal(false);
+        setWalletType(kit.StellarWalletsKit.selectedModule?.productName || null);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      // Modal closed by user — not an error
       if (!msg.includes("closed") && !msg.includes("cancel")) {
         throw new Error(msg);
       }
@@ -97,9 +113,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const disconnect = useCallback(async () => {
     try {
-      await StellarWalletsKit.disconnect();
+      const kit = await loadWalletKit();
+      await kit.StellarWalletsKit.disconnect();
     } catch {
-      // Ignore disconnect errors
+      // Ignore
     }
     setPublicKey(null);
     setConnected(false);
@@ -109,12 +126,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const signXdr = useCallback(
     async (xdr: string, networkPassphrase?: string): Promise<string> => {
       if (!connected) throw new Error("Wallet not connected");
-
+      const kit = await loadWalletKit();
       const passphrase = networkPassphrase || "Test SDF Network ; September 2015";
-      const result = await StellarWalletsKit.signTransaction(xdr, {
+      const result = await kit.StellarWalletsKit.signTransaction(xdr, {
         networkPassphrase: passphrase,
       });
-
       if (!result.signedTxXdr) throw new Error("Failed to sign transaction");
       return result.signedTxXdr;
     },
@@ -131,9 +147,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         disconnect,
         signXdr,
         availableWallets,
-        showWalletModal,
-        openWalletModal: () => setShowWalletModal(true),
-        closeWalletModal: () => setShowWalletModal(false),
       }}
     >
       {children}
