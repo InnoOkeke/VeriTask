@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useWallet } from "@/components/WalletProvider";
 import { useEscrowService } from "@/lib/escrowService";
 import { addTask } from "@/lib/store";
+import { TESTNET_USDC_ISSUER } from "@/lib/stellar";
 import type { Task, Milestone } from "@/lib/types";
 import { RequireWallet } from "@/components/RequireWallet";
 
@@ -79,7 +80,7 @@ export default function CreateTask() {
         })),
         trustline: {
           symbol: "USDC",
-          address: publicKey,
+          address: TESTNET_USDC_ISSUER,
         },
       });
 
