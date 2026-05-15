@@ -52,6 +52,8 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   const [editTitle, setEditTitle] = useState("");
   const [editDesc, setEditDesc] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [editingEvidence, setEditingEvidence] = useState<string | null>(null);
+  const [evidenceText, setEvidenceText] = useState("");
 
   const startEdit = () => {
     if (!task) return;
@@ -71,6 +73,18 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
     if (!task) return;
     await deleteTask(task.id);
     router.push("/employer");
+  };
+
+  const startEditEvidence = (milestoneId: string, currentEvidence: string) => {
+    setEditingEvidence(milestoneId);
+    setEvidenceText(currentEvidence || "");
+  };
+
+  const saveEvidence = async (milestoneId: string) => {
+    if (!task || !evidenceText.trim()) return;
+    await updateMilestone(task.id, milestoneId, { evidence: evidenceText.trim() });
+    setEditingEvidence(null);
+    refresh();
   };
 
   if (taskLoading) {
@@ -343,7 +357,44 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                   {m.evidence ? (
                     <div className="mt-3 p-3 rounded-lg bg-zinc-800/50 border border-zinc-700/50">
                       <p className="text-xs text-zinc-500 mb-1">Evidence</p>
-                      <p className="text-sm text-zinc-400">{m.evidence}</p>
+                      {role === "agent" && editingEvidence === m.id ? (
+                        <div className="space-y-2">
+                          <textarea
+                            value={evidenceText}
+                            onChange={(e) => setEvidenceText(e.target.value)}
+                            rows={3}
+                            className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500 resize-none"
+                          />
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => saveEvidence(m.id)}
+                              className="text-xs px-2.5 py-1 rounded bg-cyan-600 hover:bg-cyan-500 text-white transition-colors"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setEditingEvidence(null)}
+                              className="text-xs px-2.5 py-1 rounded text-zinc-500 hover:text-white transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-zinc-400">{m.evidence}</p>
+                      )}
+                    </div>
+                  ) : null}
+
+                  {role === "agent" && m.status === "submitted" ? (
+                    <div className="mt-2">
+                      <button
+                        onClick={() => startEditEvidence(m.id, m.evidence || "")}
+                        disabled={busy || editingEvidence === m.id}
+                        className="text-xs px-3 py-1.5 rounded-lg border border-amber-500/30 text-amber-400 hover:bg-amber-500/10 transition-colors disabled:opacity-50"
+                      >
+                        Edit Evidence & Re-submit
+                      </button>
                     </div>
                   ) : null}
 
