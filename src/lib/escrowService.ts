@@ -8,8 +8,6 @@ import {
   useChangeMilestoneStatus,
   useReleaseFunds,
   useSendTransaction,
-  useUpdateEscrow,
-  useGetEscrowFromIndexerByContractIds,
 } from "@trustless-work/escrow/hooks";
 import type {
   InitializeMultiReleaseEscrowPayload,
@@ -18,8 +16,6 @@ import type {
   ApproveMilestonePayload,
   ChangeMilestoneStatusPayload,
   MultiReleaseReleaseFundsPayload,
-  UpdateMultiReleaseEscrowPayload,
-  GetEscrowFromIndexerByContractIdsParams,
 } from "@trustless-work/escrow";
 
 export const useEscrowService = () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useWallet } from "@/components/WalletProvider";
 import { useEscrowService } from "@/lib/escrowService";
@@ -54,15 +54,10 @@ export default function CreateTask() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [milestones, setMilestones] = useState<NewMilestone[]>([{ id: "m1", description: "", amount: 0 }]);
-  const [agentAddress, setAgentAddress] = useState(walletAddress || "");
   const [deploying, setDeploying] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [draftAvailable, setDraftAvailable] = useState(!!loadDraft());
-
-  useEffect(() => {
-    if (walletAddress && !agentAddress) setAgentAddress(walletAddress);
-  }, [walletAddress, agentAddress]);
 
   const addMilestone = () => {
     setMilestones((prev) => [
@@ -119,7 +114,7 @@ export default function CreateTask() {
         platformFee: PLATFORM_FEE,
         roles: {
           approver: walletAddress,
-          serviceProvider: agentAddress || walletAddress,
+          serviceProvider: walletAddress,
           platformAddress: walletAddress,
           releaseSigner: walletAddress,
           disputeResolver: walletAddress,
@@ -127,7 +122,7 @@ export default function CreateTask() {
         milestones: milestones.map((m) => ({
           description: m.description,
           amount: m.amount,
-          receiver: agentAddress || walletAddress,
+          receiver: walletAddress,
         })),
         trustline: {
           symbol: "USDC",
@@ -271,24 +266,6 @@ export default function CreateTask() {
               required
               disabled={deploying}
             />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-2">
-              Agent Wallet Address
-              <span className="text-zinc-600 font-normal ml-1">(default: yours)</span>
-            </label>
-            <input
-              type="text"
-              value={agentAddress}
-              onChange={(e) => setAgentAddress(e.target.value)}
-              placeholder={walletAddress || "G..."}
-              className="w-full px-4 py-3 bg-zinc-900 border border-zinc-700 rounded-xl text-white placeholder:text-zinc-600 focus:outline-none focus:border-cyan-500 transition-colors font-mono text-sm"
-              disabled={deploying}
-            />
-            <p className="text-[11px] text-zinc-600 mt-1">
-              Only this wallet can submit work as an agent. Leave empty to use your own.
-            </p>
           </div>
 
           <div>

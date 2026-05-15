@@ -163,17 +163,10 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   };
 
   const handleSubmitWork = async (milestoneId: string, milestoneIndex: number) => {
-    if (!walletAddress || !task.escrowContractId || busy) return;
+    if (!walletAddress || busy) return;
     setBusy(true);
     addLog(`Submitting work for milestone ${milestoneIndex + 1}...`);
     try {
-      await handleChangeMilestoneStatus({
-        contractId: task.escrowContractId,
-        milestoneIndex: String(milestoneIndex),
-        newStatus: "Submitted",
-        serviceProvider: walletAddress,
-      });
-      addLog("Work submitted on-chain");
       const ml = task.milestones.find((m) => m.id === milestoneId);
       const generatedEvidence = `Completed work for milestone: ${ml?.description || `milestone ${milestoneIndex + 1}`}. Task output has been generated and meets the specified requirements.`;
       await updateMilestone(task.id, milestoneId, {
@@ -183,6 +176,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
       if (task.status === "claimed" || task.status === "open") {
         await updateTask(task.id, { status: "in_progress", agentAddress: walletAddress });
       }
+      addLog("Work submitted");
       refresh();
     } catch (err) {
       let msg = err instanceof Error ? err.message : String(err);
