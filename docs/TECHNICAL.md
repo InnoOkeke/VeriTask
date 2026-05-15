@@ -473,8 +473,8 @@ The auto-approve pipeline is wired in `src/app/task/[id]/page.tsx:238`: when the
 | `/` | `page.tsx` | Landing page with hero, how-it-works grid, Trustless Work feature list |
 | `/employer` | `page.tsx` | Tasks filtered by `employerAddress === walletAddress` |
 | `/employer/new` | `page.tsx` | Multi-step form: task details → escrow deploy → fund |
-| `/agent` | `agent/page.tsx` | Tasks filtered by `status: open | claimed | in_progress` |
-| `/task/[id]` | `task/[id]/page.tsx` | Detail view + role switcher + milestone lifecycle |
+| `/agent` | `agent/page.tsx` | Tasks filtered by `status: open \| claimed \| in_progress`. `Claim & Work` disabled when `in_progress` (single-agent model). Refresh button + task count. |
+| `/task/[id]` | `task/[id]/page.tsx` | Detail view + role switcher + milestone lifecycle. `?as=agent` pre-sets agent view. Employer actions gated by `isEmployer` wallet check. Agents can re-submit evidence. Edit/delete for employers. |
 | `/api/verify` | `api/verify/route.ts` | POST endpoint for deterministic verification |
 
 ### Shared Components
@@ -593,7 +593,7 @@ Content-Type: application/json
 |------|----------|-------------|-------|
 | Wallet address + name | `localStorage` | Survives refresh | Per-browser |
 | Tasks + milestones | `localStorage` (`"veritask_tasks"`) | Survives refresh | Per-browser |
-| Task create form draft | `localStorage` (`"veritask_create_draft"`) | Auto-saved | Per-browser |
+| Task create form draft | `localStorage` (`"veritask_create_draft"`) | Optional banner to load | Per-browser |
 | Trustline setup flag | `localStorage` (`"veritask_setup_${address}"`) | Survives refresh | Per-wallet |
 | Escrow state | Stellar Soroban | On-chain | Permanent |
 | Transaction log | React state (`useState`) | Session only | Per-page |
@@ -632,9 +632,11 @@ This is necessary because localStorage is external to React's state system.
 ### Key Principles
 
 1. **No private keys in the application.** All signing happens in external wallets (Freighter extension or Albedo popup).
-2. **Role-based access control.** Only the assigned `approver` can approve milestones. Only the `releaseSigner` can release funds. Only the `serviceProvider` can submit work. Enforced by the escrow smart contract.
-3. **Platform can't move funds.** The `platformAddress` only receives the configured fee. It cannot approve, release, or redirect escrow funds.
-4. **Dispute resolver as safety valve.** The `disputeResolver` can redirect funds if disputes arise (protocol-level, UI not yet built).
+2. **Role-based access control (on-chain).** Only the assigned `approver` can approve milestones. Only the `releaseSigner` can release funds. Only the `serviceProvider` can submit work. Enforced by the escrow smart contract.
+3. **Role gating (UI).** Employer-only actions (edit, delete, verify, approve, release) are gated by `isEmployer` — a wallet address check against `task.employerAddress`. The role switcher only shows the "View as employer" toggle for the actual employer. Agents see a static "View as agent" label with no employer access.
+4. **Single-agent model.** Only one agent can submit work per task. The "Claim & Work" button is disabled when a task is `in_progress`, preventing multiple agents from claiming the same escrow.
+5. **Platform can't move funds.** The `platformAddress` only receives the configured fee. It cannot approve, release, or redirect escrow funds.
+6. **Dispute resolver as safety valve.** The `disputeResolver` can redirect funds if disputes arise (protocol-level, UI not yet built).
 
 ### Trust Assumptions
 
@@ -699,12 +701,25 @@ Step 3: VERIFY (employer view on /task/[id])
   ├── Server runs 6 deterministic checks
   ├── Response: { verified: bool, checks: [...], proofHash: "..." }
   ├── If all checks pass: green banner + "Approve & Release" button
-  └── If checks fail: red banner + "Retry Verification" button
+  └── If checks fail: red banner + "Retry Verification" button (employer) or agent can re-submit evidence
+
+Step 3b: RE-SUBMIT (agent view, if verification fails)
+  ├── Agent sees "Submitted" milestone with evidence + "Edit Evidence & Re-submit" button
+  ├── Click opens inline textarea pre-filled with current evidence
+  ├── Agent rewrites evidence (longer, with milestone keywords)
+  ├── saveEvidence() → updateMilestone({ evidence: newText }) (local only)
+  ├── Employer can then "Retry Verification" against updated evidence
+  └── No on-chain action needed — milestone status remains "Submitted"
 
 Step 4: APPROVE (employer view on /task/[id])
   ├── User clicks "Approve & Release" (from VerificationPanel)
-  ├── onVerified(proofHash) → updateMilestone({ status: "approved" })
-  └── Note: Sets LOCAL state only. On-chain approve is separate.
+  ├── onVerified(proofHash) → handleApprove()
+  │   ├── handleApproveMilestone({ contractId, milestoneIndex, approver })
+  │   ├── signTransaction(xdr, walletAddress)
+  │   └── sendTransaction(signedXdr)
+  │   └── On-chain: milestone approved by approver
+  ├── updateMilestone({ status: "approved" }) (local)
+  └── refresh()
 
 Step 5: RELEASE PAYMENT (employer view on /task/[id])
   ├── Approved milestone shows "Release Payment" button
