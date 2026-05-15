@@ -87,6 +87,8 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
     refresh();
   };
 
+  const isEmployer = walletAddress && task && walletAddress === task.employerAddress;
+
   if (taskLoading) {
     return (
       <RequireWallet>
@@ -192,17 +194,16 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
             ← Back
           </button>
           <div className="flex items-center gap-2 bg-zinc-900 rounded-lg border border-zinc-800 p-1">
-            {(["employer", "agent"] as const).map((r) => (
+            {isEmployer ? (
               <button
-                key={r}
-                onClick={() => setRole(r)}
-                className={`text-xs px-3 py-1.5 rounded-md capitalize transition-colors ${
-                  role === r ? "bg-violet-600 text-white" : "text-zinc-500 hover:text-white"
-                }`}
+                onClick={() => setRole(role === "employer" ? "agent" : "employer")}
+                className="text-xs px-3 py-1.5 rounded-md capitalize transition-colors bg-violet-600 text-white"
               >
-                View as {r}
+                View as {role === "employer" ? "agent" : "employer"}
               </button>
-            ))}
+            ) : (
+              <span className="text-xs px-3 py-1.5 text-zinc-500">View as agent</span>
+            )}
           </div>
         </div>
 
@@ -257,7 +258,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                   >
                     {task.status.replace("_", " ")}
                   </span>
-                  {role === "employer" ? (
+                  {isEmployer ? (
                     <div className="flex items-center gap-1">
                       <button
                         onClick={startEdit}
@@ -398,7 +399,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                     </div>
                   ) : null}
 
-                  {role === "employer" && m.status === "submitted" ? (
+                  {isEmployer && m.status === "submitted" ? (
                     <VerificationPanel
                       milestoneDescription={m.description}
                       evidence={m.evidence}
@@ -424,7 +425,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                       ) : null}
                     </>
                   ) : null}
-                  {role === "employer" ? (
+                  {isEmployer ? (
                     <>
                       {m.status === "approved" && task.escrowContractId ? (
                         <button
