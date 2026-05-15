@@ -21,7 +21,6 @@ export interface Task {
   employerAddress: string;
   agentAddress?: string;
   escrowContractId?: string;
-  escrowData?: Record<string, unknown>;
   engagementId: string;
   createdAt: Date;
 }

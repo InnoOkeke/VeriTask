@@ -28,7 +28,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   const { id } = use(params);
   const router = useRouter();
   const { walletAddress } = useWallet();
-  const { handleApproveMilestone, handleReleaseFunds, handleUpdateMilestoneReceiver } = useEscrowService();
+  const { handleApproveMilestone, handleReleaseFunds, handleForwardPayment, handleChangeMilestoneStatus } = useEscrowService();
   const searchParams = useSearchParams();
   const defaultRole = searchParams.get("as") === "agent" ? "agent" : "employer";
   const [role, setRole] = useState<"employer" | "agent">(defaultRole);
@@ -134,23 +134,20 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
     setBusy(true);
     addLog(`Releasing payment for milestone ${milestoneIndex + 1}...`);
     try {
-      if (task.agentAddress && task.escrowData) {
-        addLog(`Updating receiver to agent address...`);
-        await handleUpdateMilestoneReceiver(
-          task.escrowContractId,
-          milestoneIndex,
-          task.agentAddress,
-          walletAddress,
-          task.escrowData
-        );
-        addLog("Receiver updated on-chain");
-      }
       await handleReleaseFunds({
         contractId: task.escrowContractId,
         milestoneIndex: String(milestoneIndex),
         releaseSigner: walletAddress,
       });
-      addLog("Payment released on-chain");
+      addLog("Escrow released on-chain");
+
+      if (task.agentAddress && task.agentAddress !== walletAddress) {
+        const ml = task.milestones.find((m) => m.id === milestoneId);
+        addLog(`Forwarding ${ml?.amount} USDC to agent...`);
+        await handleForwardPayment(walletAddress, task.agentAddress, String(ml?.amount || 0));
+        addLog(`Payment sent to agent: ${task.agentAddress.slice(0, 8)}...`);
+      }
+
       await updateMilestone(task.id, milestoneId, { status: "released" });
       const t = await getTask(id);
       if (t && t.milestones.every((m) => m.status === "released" || m.status === "paid")) {
@@ -180,6 +177,18 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
     try {
       const ml = task.milestones.find((m) => m.id === milestoneId);
       const generatedEvidence = `Completed work for milestone: ${ml?.description || `milestone ${milestoneIndex + 1}`}. Task output has been generated and meets the specified requirements.`;
+      if (task.escrowContractId && walletAddress === task.employerAddress) {
+        await handleChangeMilestoneStatus({
+          contractId: task.escrowContractId,
+          milestoneIndex: String(milestoneIndex),
+          newStatus: "Submitted",
+          newEvidence: generatedEvidence,
+          serviceProvider: walletAddress,
+        });
+        addLog("Work submitted on-chain");
+      } else {
+        addLog("Work submitted");
+      }
       await updateMilestone(task.id, milestoneId, {
         status: "submitted",
         evidence: generatedEvidence,
@@ -187,7 +196,6 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
       if (task.status === "claimed" || task.status === "open") {
         await updateTask(task.id, { status: "in_progress", agentAddress: walletAddress });
       }
-      addLog("Work submitted");
       refresh();
     } catch (err) {
       let msg = err instanceof Error ? err.message : String(err);

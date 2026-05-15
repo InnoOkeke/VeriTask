@@ -8,7 +8,6 @@ import {
   useChangeMilestoneStatus,
   useReleaseFunds,
   useSendTransaction,
-  useUpdateEscrow,
 } from "@trustless-work/escrow/hooks";
 import type {
   InitializeMultiReleaseEscrowPayload,
@@ -17,8 +16,11 @@ import type {
   ApproveMilestonePayload,
   ChangeMilestoneStatusPayload,
   MultiReleaseReleaseFundsPayload,
-  UpdateMultiReleaseEscrowPayload,
 } from "@trustless-work/escrow";
+import { Account, Asset, Operation, TransactionBuilder, Networks } from "@stellar/stellar-sdk";
+
+const HORIZON = "https://horizon-testnet.stellar.org";
+const USDC_ISSUER = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
 
 export const useEscrowService = () => {
   const { signTransaction } = useWallet();
@@ -28,7 +30,6 @@ export const useEscrowService = () => {
   const { approveMilestone } = useApproveMilestone();
   const { releaseFunds } = useReleaseFunds();
   const { sendTransaction } = useSendTransaction();
-  const { updateEscrow } = useUpdateEscrow();
 
   const handleDeploy = async (payload: InitializeMultiReleaseEscrowPayload): Promise<InitializeMultiReleaseEscrowResponse> => {
     const unsigned = await deployEscrow(payload, "multi-release");
@@ -64,42 +65,27 @@ export const useEscrowService = () => {
     return sendTransaction(signedXdr);
   };
 
-  const handleUpdateMilestoneReceiver = async (
-    contractId: string,
-    milestoneIndex: number,
-    agentAddress: string,
-    signer: string,
-    storedEscrow: Record<string, unknown>
-  ) => {
-    const r = storedEscrow.roles as Record<string, string>;
-    const tl = (storedEscrow.trustline || {}) as Record<string, string>;
-    const fallback = signer;
-    const milestones = [...(storedEscrow.milestones as Record<string, unknown>[])];
-    milestones[milestoneIndex] = { ...milestones[milestoneIndex], receiver: agentAddress };
+  const handleForwardPayment = async (fromAddress: string, toAddress: string, amount: string) => {
+    const resp = await fetch(`${HORIZON}/accounts/${fromAddress}`);
+    if (!resp.ok) throw new Error("Failed to fetch account");
+    const accountData = await resp.json();
+    const account = new Account(accountData.account_id, accountData.sequence);
 
-    const payload: UpdateMultiReleaseEscrowPayload = {
-      contractId,
-      signer,
-      escrow: {
-        engagementId: storedEscrow.engagementId as string,
-        title: storedEscrow.title as string,
-        description: storedEscrow.description as string,
-        platformFee: storedEscrow.platformFee as number,
-        roles: {
-          approver: r.approver || fallback,
-          serviceProvider: r.serviceProvider || fallback,
-          platformAddress: r.platformAddress || fallback,
-          releaseSigner: r.releaseSigner || fallback,
-          disputeResolver: r.disputeResolver || fallback,
-        },
-        milestones: milestones as UpdateMultiReleaseEscrowPayload["escrow"]["milestones"],
-        trustline: { symbol: tl.symbol || "USDC", address: tl.address || "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5" },
-        isActive: true,
-      },
-    };
+    const tx = new TransactionBuilder(account, {
+      fee: "10000",
+      networkPassphrase: Networks.TESTNET,
+    })
+      .addOperation(
+        Operation.payment({
+          destination: toAddress,
+          asset: new Asset("USDC", USDC_ISSUER),
+          amount,
+        })
+      )
+      .setTimeout(30)
+      .build();
 
-    const unsigned = await updateEscrow(payload, "multi-release");
-    const signedXdr = await signTransaction(unsigned.unsignedTransaction!, signer);
+    const signedXdr = await signTransaction(tx.toXDR(), fromAddress);
     return sendTransaction(signedXdr);
   };
 
@@ -109,6 +95,6 @@ export const useEscrowService = () => {
     handleChangeMilestoneStatus,
     handleApproveMilestone,
     handleReleaseFunds,
-    handleUpdateMilestoneReceiver,
+    handleForwardPayment,
   };
 };
