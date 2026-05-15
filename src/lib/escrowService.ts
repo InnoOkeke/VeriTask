@@ -67,8 +67,20 @@ export const useEscrowService = () => {
 
   const handleForwardPayment = async (fromAddress: string, toAddress: string, amount: string) => {
     const resp = await fetch(`${HORIZON}/accounts/${fromAddress}`);
-    if (!resp.ok) throw new Error("Failed to fetch account");
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || err.title || "Failed to fetch account");
+    }
     const accountData = await resp.json();
+
+    const usdcBalance = accountData.balances?.find(
+      (b: Record<string, unknown>) => b.asset_code === "USDC" && b.asset_issuer === USDC_ISSUER
+    );
+    const balance = parseFloat((usdcBalance?.balance as string) || "0");
+    if (balance < parseFloat(amount)) {
+      throw new Error(`Insufficient USDC balance: ${balance} available, ${amount} needed`);
+    }
+
     const account = new Account(accountData.account_id, accountData.sequence);
 
     const tx = new TransactionBuilder(account, {
@@ -86,7 +98,17 @@ export const useEscrowService = () => {
       .build();
 
     const signedXdr = await signTransaction(tx.toXDR(), fromAddress);
-    return sendTransaction(signedXdr);
+
+    const submitResp = await fetch(`${HORIZON}/transactions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `tx=${encodeURIComponent(signedXdr)}`,
+    });
+    const submitJson = await submitResp.json();
+    if (!submitResp.ok) {
+      throw new Error(submitJson.extras?.result_codes?.transaction || submitJson.detail || submitJson.title || "Payment failed");
+    }
+    return submitJson;
   };
 
   return {

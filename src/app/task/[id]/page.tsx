@@ -142,6 +142,8 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
       addLog("Escrow released on-chain");
 
       if (task.agentAddress && task.agentAddress !== walletAddress) {
+        addLog("Waiting for funds to settle...");
+        await new Promise((r) => setTimeout(r, 5000));
         const ml = task.milestones.find((m) => m.id === milestoneId);
         addLog(`Forwarding ${ml?.amount} USDC to agent...`);
         await handleForwardPayment(walletAddress, task.agentAddress, String(ml?.amount || 0));
