@@ -43,7 +43,6 @@ const freighterModule: ModuleInterface = {
     const result = await freighterSign(xdr, {
       networkPassphrase: opts?.networkPassphrase,
       address: opts?.address,
-      path: opts?.path,
     });
     return { signedTxXdr: result.signedTxXdr, signerAddress: result.signerAddress };
   },
