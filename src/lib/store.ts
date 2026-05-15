@@ -23,6 +23,7 @@ function rowToTask(row: Record<string, unknown>): Task {
     employerAddress: row.employer_address as string,
     agentAddress: (row.agent_address as string) || undefined,
     escrowContractId: (row.escrow_contract_id as string) || undefined,
+    escrowData: (row.escrow_data as Record<string, unknown>) || undefined,
     engagementId: row.engagement_id as string,
     createdAt: new Date(row.created_at as string),
   };
@@ -40,6 +41,7 @@ function taskToRow(task: Task): Record<string, unknown> {
     employer_address: task.employerAddress,
     agent_address: task.agentAddress || null,
     escrow_contract_id: task.escrowContractId || null,
+    escrow_data: task.escrowData || null,
     engagement_id: task.engagementId,
     created_at: task.createdAt.toISOString(),
   };
@@ -116,6 +118,7 @@ export async function updateTask(id: string, updates: Partial<Task>): Promise<vo
     if (updates.milestones !== undefined) row.milestones = updates.milestones;
     if (updates.agentAddress !== undefined) row.agent_address = updates.agentAddress;
     if (updates.escrowContractId !== undefined) row.escrow_contract_id = updates.escrowContractId;
+    if (updates.escrowData !== undefined) row.escrow_data = updates.escrowData;
 
     const { error } = await sb()!.from("tasks").update(row).eq("id", id);
     if (error) {

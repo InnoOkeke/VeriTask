@@ -140,7 +140,8 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
           task.escrowContractId,
           milestoneIndex,
           task.agentAddress,
-          walletAddress
+          walletAddress,
+          task.escrowData
         );
         addLog("Receiver updated on-chain");
       }

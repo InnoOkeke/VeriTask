@@ -31,14 +31,18 @@ export const useEscrowService = () => {
   const { updateEscrow } = useUpdateEscrow();
   const { getEscrowByContractIds } = useGetEscrowFromIndexerByContractIds();
 
-  const handleDeploy = async (payload: InitializeMultiReleaseEscrowPayload): Promise<InitializeMultiReleaseEscrowResponse> => {
+  const handleDeploy = async (payload: InitializeMultiReleaseEscrowPayload): Promise<{ contractId: string; escrow?: Record<string, unknown> }> => {
     const unsigned = await deployEscrow(payload, "multi-release");
     if (!unsigned?.unsignedTransaction) {
       throw new Error(`Escrow API returned no unsigned transaction. Response: ${JSON.stringify(unsigned)}`);
     }
     const signedXdr = await signTransaction(unsigned.unsignedTransaction, payload.signer);
-    const result = await sendTransaction(signedXdr);
-    return result as InitializeMultiReleaseEscrowResponse;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = await sendTransaction(signedXdr) as any;
+    return {
+      contractId: result.contractId as string,
+      escrow: result.escrow as Record<string, unknown> | undefined,
+    };
   };
 
   const handleFund = async (payload: FundEscrowPayload) => {
@@ -69,20 +73,17 @@ export const useEscrowService = () => {
     contractId: string,
     milestoneIndex: number,
     agentAddress: string,
-    signer: string
+    signer: string,
+    storedEscrowData?: Record<string, unknown>
   ) => {
-    const result = await getEscrowByContractIds({
-      contractIds: [contractId],
-      validateOnChain: false,
-    });
-    const escrowData = Array.isArray(result) ? result[0] : result;
-    if (!escrowData) throw new Error("Escrow not found on-chain");
+    const escrowData = storedEscrowData;
+    if (!escrowData) throw new Error("No escrow data available — task must have been deployed with escrow data");
 
     const milestones = [...(escrowData.milestones as Record<string, unknown>[])];
     if (!milestones[milestoneIndex]) throw new Error("Milestone not found");
     milestones[milestoneIndex] = { ...milestones[milestoneIndex], receiver: agentAddress };
 
-    const d = escrowData as Record<string, unknown>;
+    const d = escrowData;
     const cleanEscrow: Record<string, unknown> = {};
     const allowed = ["engagementId", "title", "description", "platformFee", "trustline", "roles", "milestones", "isActive"];
     for (const key of allowed) {
