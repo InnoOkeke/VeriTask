@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useWallet } from "@/components/WalletProvider";
 import { useEscrowService } from "@/lib/escrowService";
@@ -15,18 +15,53 @@ interface NewMilestone {
   amount: number;
 }
 
+interface Draft {
+  title: string;
+  description: string;
+  milestones: NewMilestone[];
+}
+
+const DRAFT_KEY = "veritask_create_draft";
+
+function loadDraft(): Draft | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveDraft(draft: Draft) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+}
+
+function clearDraft() {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(DRAFT_KEY);
+}
+
 export default function CreateTask() {
   const router = useRouter();
   const { publicKey } = useWallet();
   const escrow = useEscrowService();
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [milestones, setMilestones] = useState<NewMilestone[]>([
-    { id: "m1", description: "", amount: 0 },
-  ]);
+
+  const draft = loadDraft();
+  const [title, setTitle] = useState(draft?.title || "");
+  const [description, setDescription] = useState(draft?.description || "");
+  const [milestones, setMilestones] = useState<NewMilestone[]>(
+    draft?.milestones?.length ? draft.milestones : [{ id: "m1", description: "", amount: 0 }]
+  );
   const [deploying, setDeploying] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+
+  // Auto-save to localStorage on every change
+  useEffect(() => {
+    saveDraft({ title, description, milestones });
+  }, [title, description, milestones]);
 
   const addMilestone = () => {
     setMilestones((prev) => [
@@ -137,6 +172,7 @@ export default function CreateTask() {
       };
 
       addTask(task);
+      clearDraft();
       setStatus("Task created and escrow funded!");
       setTimeout(() => router.push("/employer"), 1500);
     } catch (err) {
@@ -158,9 +194,24 @@ export default function CreateTask() {
         </button>
 
         <h1 className="text-2xl font-bold mb-2">Create AI Task</h1>
-        <p className="text-zinc-400 text-sm mb-8">
+        <p className="text-zinc-400 text-sm mb-1">
           Define milestones. An escrow is deployed on Stellar — funds release only when each milestone is verified.
         </p>
+        {(draft && (draft.title || draft.description)) && (
+          <p className="text-xs text-zinc-600 mb-6">
+            Form auto-saved.{" "}
+            <button
+              type="button"
+              onClick={() => { clearDraft(); setTitle(""); setDescription(""); setMilestones([{ id: "m1", description: "", amount: 0 }]); }}
+              className="text-zinc-500 hover:text-red-400 transition-colors underline"
+            >
+              Clear draft
+            </button>
+          </p>
+        )}
+        {(!draft || (!draft.title && !draft.description)) && (
+          <p className="text-xs text-zinc-600 mb-6">Form auto-saves to this device.</p>
+        )}
 
         {status && (
           <div className="mb-6 p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 text-sm text-emerald-400">
