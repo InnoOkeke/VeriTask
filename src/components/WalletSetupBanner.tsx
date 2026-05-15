@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useWallet } from "@/components/WalletProvider";
-import { Asset, Operation, TransactionBuilder, Networks } from "@stellar/stellar-sdk";
+import { Account, Asset, Operation, TransactionBuilder, Networks } from "@stellar/stellar-sdk";
 
 const USDC_ISSUER = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
 
@@ -31,7 +31,8 @@ export function WalletSetupBanner() {
       const accountData = await resp.json();
 
       // Build ChangeTrust transaction
-      const account = new TransactionBuilder(accountData, {
+      const account = new Account(accountData.account_id, accountData.sequence);
+      const tx = new TransactionBuilder(account, {
         fee: "10000",
         networkPassphrase: Networks.TESTNET,
       })
@@ -43,7 +44,7 @@ export function WalletSetupBanner() {
         .setTimeout(30)
         .build();
 
-      const xdr = account.toXDR();
+      const xdr = tx.toXDR();
 
       // Sign with connected wallet
       const signedXdr = await signXdr(xdr, Networks.TESTNET);
