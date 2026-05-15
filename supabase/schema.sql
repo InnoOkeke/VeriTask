@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   employer_address TEXT NOT NULL,
   agent_address TEXT,
   escrow_contract_id TEXT,
+  escrow_data JSONB,
   engagement_id TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
