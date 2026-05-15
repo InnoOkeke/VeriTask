@@ -8,10 +8,10 @@ import type { WalletType } from "@/components/WalletProvider";
 
 const AVAILABLE_WALLETS: { type: WalletType; icon: string; desc: string }[] = [
   { type: "freighter", icon: "🦊", desc: "Browser extension" },
-  { type: "albedo", icon: "☀️", desc: "Web wallet (popup)" },
   { type: "xbull", icon: "🐂", desc: "Browser extension" },
   { type: "rabet", icon: "🐰", desc: "Browser extension" },
-  { type: "lobstr", icon: "🐳", desc: "Mobile & web" },
+  { type: "albedo", icon: "☀️", desc: "Web wallet (popup)" },
+  { type: "lobstr", icon: "🐳", desc: "Mobile wallet" },
 ];
 
 export function Header() {

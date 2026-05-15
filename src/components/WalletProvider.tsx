@@ -88,23 +88,17 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     try {
       let pk = "";
 
-      if (type === "freighter") {
+      if (type === "freighter" || type === "xbull" || type === "rabet") {
         const conn = await freighterIsConnected();
-        if (!conn.isConnected) throw new Error("Freighter not installed. Get it at freighter.app");
+        if (!conn.isConnected) throw new Error(`${getWalletName(type)} not detected. Make sure it's installed and unlocked.`);
         const access = await requestAccess();
         if (access.error) throw new Error(String(access.error));
         const addr = await freighterGetAddress();
         pk = addr.address;
       } else if (type === "albedo") {
         pk = await albedoConnect();
-      } else if (type === "xbull") {
-        const conn = await freighterIsConnected();
-        if (!conn.isConnected) throw new Error("xBull not detected. Try Freighter or Albedo.");
-        const access = await requestAccess();
-        if (access.error) throw new Error(String(access.error));
-        const addr = await freighterGetAddress();
-        pk = addr.address;
-      } else {
+      } else if (type === "lobstr") {
+        throw new Error("LOBSTR is a mobile wallet. Use WalletConnect or open the app on mobile.");
         throw new Error(`${getWalletName(type)} integration coming soon. Use Freighter or Albedo.`);
       }
 
@@ -128,7 +122,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       if (!connected || !publicKey) throw new Error("Wallet not connected");
       const passphrase = networkPassphrase || "Test SDF Network ; September 2015";
 
-      if (walletType === "freighter" || walletType === "xbull") {
+      if (walletType === "freighter" || walletType === "xbull" || walletType === "rabet") {
         const result = await freighterSign(xdr, {
           networkPassphrase: passphrase,
           address: publicKey,
