@@ -13,6 +13,7 @@ import {
 import type {
   EscrowType,
   InitializeMultiReleaseEscrowPayload,
+  InitializeMultiReleaseEscrowResponse,
   FundEscrowPayload,
   ApproveMilestonePayload,
   ChangeMilestoneStatusPayload,
@@ -39,20 +40,23 @@ export function useEscrowService() {
     deploy: async (payload: InitializeMultiReleaseEscrowPayload) => {
       const res = await deployEscrow(payload, "multi-release" as EscrowType);
       if (res.status !== "SUCCESS" || !res.unsignedTransaction) {
-        const detail = JSON.stringify(res);
-        throw new Error(`Escrow deploy failed: ${detail}`);
+        throw new Error(`Deploy failed: ${JSON.stringify(res)}`);
       }
       const txRes = await signAndSend(res.unsignedTransaction);
       if (txRes.status !== "SUCCESS") {
-        throw new Error(`Transaction failed: ${JSON.stringify(txRes)}`);
+        throw new Error(`Deploy tx failed: ${JSON.stringify(txRes)}`);
       }
-      return txRes as { status: string; contractId?: string; message?: string };
+      const initRes = txRes as InitializeMultiReleaseEscrowResponse;
+      if (!initRes.contractId) {
+        throw new Error(`No contractId in response: ${JSON.stringify(txRes)}`);
+      }
+      return initRes;
     },
 
     fund: async (payload: FundEscrowPayload) => {
       const res = await fundEscrow(payload, "multi-release" as EscrowType);
       if (res.status !== "SUCCESS" || !res.unsignedTransaction) {
-        throw new Error("Failed to fund escrow");
+        throw new Error(`Fund failed: ${JSON.stringify(res)}`);
       }
       return signAndSend(res.unsignedTransaction);
     },

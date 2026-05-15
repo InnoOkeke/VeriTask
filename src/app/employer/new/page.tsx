@@ -84,9 +84,12 @@ export default function CreateTask() {
         },
       });
 
-      const contractId = result.contractId || "";
+      const contractId = result.contractId;
 
       setStatus("Escrow deployed. Funding...");
+
+      // Wait for contract to confirm on-chain before funding
+      await new Promise((r) => setTimeout(r, 5000));
 
       await escrow.fund({
         contractId,
