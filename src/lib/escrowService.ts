@@ -72,7 +72,8 @@ export const useEscrowService = () => {
     storedEscrow: Record<string, unknown>
   ) => {
     const r = storedEscrow.roles as Record<string, string>;
-    const tl = storedEscrow.trustline as Record<string, string>;
+    const tl = (storedEscrow.trustline || {}) as Record<string, string>;
+    const fallback = signer;
     const milestones = [...(storedEscrow.milestones as Record<string, unknown>[])];
     milestones[milestoneIndex] = { ...milestones[milestoneIndex], receiver: agentAddress };
 
@@ -85,11 +86,11 @@ export const useEscrowService = () => {
         description: storedEscrow.description as string,
         platformFee: storedEscrow.platformFee as number,
         roles: {
-          approver: r.approver,
-          serviceProvider: r.serviceProvider,
-          platformAddress: r.platformAddress,
-          releaseSigner: r.releaseSigner,
-          disputeResolver: r.disputeResolver,
+          approver: r.approver || fallback,
+          serviceProvider: r.serviceProvider || fallback,
+          platformAddress: r.platformAddress || fallback,
+          releaseSigner: r.releaseSigner || fallback,
+          disputeResolver: r.disputeResolver || fallback,
         },
         milestones: milestones as UpdateMultiReleaseEscrowPayload["escrow"]["milestones"],
         trustline: { symbol: tl.symbol || "USDC", address: tl.address || "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5" },
