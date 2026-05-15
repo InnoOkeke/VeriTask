@@ -83,7 +83,7 @@ export default function AgentBoard() {
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <Link
-                      href={`/task/${task.id}`}
+                      href={`/task/${task.id}?as=agent`}
                       className="text-xs px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium transition-colors whitespace-nowrap"
                     >
                       Claim & Work

@@ -2,7 +2,7 @@
 
 import { use, useState, useCallback, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useWallet } from "@/components/WalletProvider";
 import { RequireWallet } from "@/components/RequireWallet";
 import { getTask, updateMilestone, updateTask } from "@/lib/store";
@@ -29,7 +29,9 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   const router = useRouter();
   const { walletAddress } = useWallet();
   const { handleApproveMilestone, handleReleaseFunds, handleChangeMilestoneStatus } = useEscrowService();
-  const [role, setRole] = useState<"employer" | "agent">("employer");
+  const searchParams = useSearchParams();
+  const defaultRole = searchParams.get("as") === "agent" ? "agent" : "employer";
+  const [role, setRole] = useState<"employer" | "agent">(defaultRole);
   const [busy, setBusy] = useState(false);
   const [log, setLog] = useState<string[]>([]);
   const [task, setTask] = useState<Task | undefined>(undefined);
