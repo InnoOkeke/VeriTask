@@ -7,6 +7,7 @@ import { useEscrowService } from "@/lib/escrowService";
 import { addTask } from "@/lib/store";
 import type { Task, Milestone } from "@/lib/types";
 import { RequireWallet } from "@/components/RequireWallet";
+import { WalletSetupBanner } from "@/components/WalletSetupBanner";
 
 interface NewMilestone {
   id: string;
@@ -124,6 +125,7 @@ export default function CreateTask() {
 
   return (
     <RequireWallet>
+      <WalletSetupBanner />
       <div className="max-w-2xl mx-auto px-4 py-12">
         <button
           onClick={() => router.back()}

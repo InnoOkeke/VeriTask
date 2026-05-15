@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useWallet } from "@/components/WalletProvider";
 import { RequireWallet } from "@/components/RequireWallet";
+import { WalletSetupBanner } from "@/components/WalletSetupBanner";
 import { loadTasks } from "@/lib/store";
 import { useEscrowService } from "@/lib/escrowService";
 import type { Task } from "@/lib/types";
@@ -38,6 +39,7 @@ export default function EmployerDashboard() {
 
   return (
     <RequireWallet>
+      <WalletSetupBanner />
       <div className="max-w-5xl mx-auto px-4 py-12">
         <div className="flex items-center justify-between mb-10">
           <div>

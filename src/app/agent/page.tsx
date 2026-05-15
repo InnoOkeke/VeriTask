@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useWallet } from "@/components/WalletProvider";
 import { RequireWallet } from "@/components/RequireWallet";
+import { WalletSetupBanner } from "@/components/WalletSetupBanner";
 import { loadTasks } from "@/lib/store";
 import type { Task } from "@/lib/types";
 
@@ -23,6 +24,7 @@ export default function AgentBoard() {
 
   return (
     <RequireWallet>
+      <WalletSetupBanner />
       <div className="max-w-5xl mx-auto px-4 py-12">
         <div className="mb-10">
           <h1 className="text-2xl font-bold">AI Agent Board</h1>
