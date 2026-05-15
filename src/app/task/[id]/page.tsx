@@ -51,6 +51,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editDesc, setEditDesc] = useState("");
+  const [editMilestones, setEditMilestones] = useState<{ id: string; description: string; amount: number }[]>([]);
   const [deleting, setDeleting] = useState(false);
   const [editingEvidence, setEditingEvidence] = useState<string | null>(null);
   const [evidenceText, setEvidenceText] = useState("");
@@ -59,14 +60,32 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
     if (!task) return;
     setEditTitle(task.title);
     setEditDesc(task.description);
+    setEditMilestones(task.milestones.map((m) => ({ id: m.id, description: m.description, amount: m.amount })));
     setEditing(true);
   };
 
   const saveEdit = async () => {
     if (!task || !editTitle.trim()) return;
-    await updateTask(task.id, { title: editTitle.trim(), description: editDesc.trim() });
+    const milestones = editMilestones.map((em, i) => ({
+      id: em.id,
+      description: em.description,
+      amount: em.amount,
+      status: task.milestones[i]?.status || "pending" as const,
+      evidence: task.milestones[i]?.evidence,
+    }));
+    const totalAmount = milestones.reduce((sum, m) => sum + (m.amount || 0), 0);
+    await updateTask(task.id, {
+      title: editTitle.trim(),
+      description: editDesc.trim(),
+      milestones,
+      totalAmount,
+    });
     setEditing(false);
     refresh();
+  };
+
+  const updateEditMilestone = (id: string, field: "description" | "amount", value: string | number) => {
+    setEditMilestones((prev) => prev.map((m) => (m.id === id ? { ...m, [field]: value } : m)));
   };
 
   const handleDelete = async () => {
@@ -223,6 +242,36 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                 className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm focus:outline-none focus:border-violet-500 resize-none"
                 placeholder="Task description"
               />
+              <div>
+                <p className="text-xs text-zinc-500 mb-2">Milestones</p>
+                <div className="space-y-2">
+                  {editMilestones.map((em, i) => (
+                    <div key={em.id} className="flex items-center gap-2">
+                      <span className="text-xs text-zinc-600 font-mono w-5">#{i + 1}</span>
+                      <input
+                        type="text"
+                        value={em.description}
+                        onChange={(e) => updateEditMilestone(em.id, "description", e.target.value)}
+                        className="flex-1 px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-sm text-white focus:outline-none focus:border-violet-500"
+                        placeholder="Milestone description"
+                      />
+                      <input
+                        type="number"
+                        value={em.amount || ""}
+                        onChange={(e) => updateEditMilestone(em.id, "amount", parseFloat(e.target.value) || 0)}
+                        className="w-20 px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-sm text-white focus:outline-none focus:border-violet-500"
+                        placeholder="USDC"
+                        min={0}
+                        step={0.01}
+                      />
+                      <span className="text-xs text-zinc-600">USDC</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-zinc-600 mt-1">
+                  Total: {editMilestones.reduce((sum, m) => sum + (m.amount || 0), 0)} USDC
+                </p>
+              </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={saveEdit}
