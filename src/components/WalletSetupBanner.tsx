@@ -153,6 +153,7 @@ export function WalletSetupBanner() {
             </div>
           </div>
           <button
+            type="button"
             onClick={() => setDismissed(true)}
             className="text-zinc-500 hover:text-white text-lg flex-shrink-0"
           >
