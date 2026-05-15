@@ -39,11 +39,12 @@ export function useEscrowService() {
     deploy: async (payload: InitializeMultiReleaseEscrowPayload) => {
       const res = await deployEscrow(payload, "multi-release" as EscrowType);
       if (res.status !== "SUCCESS" || !res.unsignedTransaction) {
-        throw new Error("Failed to initialize escrow");
+        const detail = JSON.stringify(res);
+        throw new Error(`Escrow deploy failed: ${detail}`);
       }
       const txRes = await signAndSend(res.unsignedTransaction);
       if (txRes.status !== "SUCCESS") {
-        throw new Error("Transaction failed");
+        throw new Error(`Transaction failed: ${JSON.stringify(txRes)}`);
       }
       return txRes as { status: string; contractId?: string; message?: string };
     },
