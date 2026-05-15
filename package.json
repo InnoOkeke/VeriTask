@@ -12,6 +12,7 @@
     "@creit.tech/stellar-wallets-kit": "^2.2.0",
     "@stellar/freighter-api": "^6.0.1",
     "@stellar/stellar-sdk": "^15.1.0",
+    "@supabase/supabase-js": "^2.105.4",
     "@trustless-work/blocks": "^1.2.5",
     "@trustless-work/escrow": "^3.0.5",
     "next": "16.2.6",

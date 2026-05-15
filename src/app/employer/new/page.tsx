@@ -164,7 +164,7 @@ export default function CreateTask() {
         createdAt: new Date(),
       };
 
-      addTask(task);
+      await addTask(task);
       clearDraft();
       setStatus("Task created and escrow funded!");
       setTimeout(() => router.push("/employer"), 1500);

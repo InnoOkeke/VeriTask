@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState, useCallback } from "react";
+import { use, useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useWallet } from "@/components/WalletProvider";
@@ -9,6 +9,7 @@ import { getTask, updateMilestone, updateTask } from "@/lib/store";
 import { useEscrowService } from "@/lib/escrowService";
 import { VerificationPanel } from "@/components/VerificationPanel";
 import { DEMO_TASKS } from "@/lib/demo";
+import type { Task } from "@/lib/types";
 
 const statusBadge = (status: string) => {
   const map: Record<string, string> = {
@@ -31,11 +32,29 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   const [role, setRole] = useState<"employer" | "agent">("employer");
   const [busy, setBusy] = useState(false);
   const [log, setLog] = useState<string[]>([]);
-  const [, forceUpdate] = useState(0);
+  const [task, setTask] = useState<Task | undefined>(undefined);
+  const [taskLoading, setTaskLoading] = useState(true);
 
-  const task = getTask(id) || DEMO_TASKS.find((t) => t.id === id);
-  const refresh = () => forceUpdate((n) => n + 1);
+  const loadTask = useCallback(async () => {
+    const found = await getTask(id);
+    setTask(found || DEMO_TASKS.find((t) => t.id === id));
+    setTaskLoading(false);
+  }, [id]);
+
+  useEffect(() => { loadTask(); }, [loadTask]);
+
+  const refresh = () => { loadTask(); };
   const addLog = useCallback((msg: string) => setLog((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]), []);
+
+  if (taskLoading) {
+    return (
+      <RequireWallet>
+        <div className="max-w-3xl mx-auto px-4 py-20 text-center">
+          <p className="text-zinc-500">Loading task...</p>
+        </div>
+      </RequireWallet>
+    );
+  }
 
   if (!task) {
     return (
@@ -59,7 +78,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
         approver: walletAddress,
       });
       addLog("Milestone approved on-chain");
-      updateMilestone(task.id, milestoneId, { status: "approved" });
+      await updateMilestone(task.id, milestoneId, { status: "approved" });
       refresh();
     } catch (err) {
       addLog(`Error: ${err instanceof Error ? err.message : String(err)}`);
@@ -78,11 +97,11 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
         releaseSigner: walletAddress,
       });
       addLog("Payment released on-chain");
-      updateMilestone(task.id, milestoneId, { status: "released" });
-      const t = getTask(id);
+      await updateMilestone(task.id, milestoneId, { status: "released" });
+      const t = await getTask(id);
       if (t && t.milestones.every((m) => m.status === "released" || m.status === "paid")) {
-        updateTask(task.id, { status: "paid" });
-        updateMilestone(task.id, milestoneId, { status: "paid" });
+        await updateTask(task.id, { status: "paid" });
+        await updateMilestone(task.id, milestoneId, { status: "paid" });
       }
       refresh();
     } catch (err) {
@@ -105,12 +124,12 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
       addLog("Work submitted on-chain");
       const ml = task.milestones.find((m) => m.id === milestoneId);
       const generatedEvidence = `Completed work for milestone: ${ml?.description || `milestone ${milestoneIndex + 1}`}. Task output has been generated and meets the specified requirements.`;
-      updateMilestone(task.id, milestoneId, {
+      await updateMilestone(task.id, milestoneId, {
         status: "submitted",
         evidence: generatedEvidence,
       });
       if (task.status === "claimed" || task.status === "open") {
-        updateTask(task.id, { status: "in_progress", agentAddress: walletAddress });
+        await updateTask(task.id, { status: "in_progress", agentAddress: walletAddress });
       }
       refresh();
     } catch (err) {

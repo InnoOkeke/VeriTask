@@ -11,8 +11,8 @@ export default function AgentBoard() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const loadBoard = () => {
-    const all = loadTasks();
+  const loadBoard = async () => {
+    const all = await loadTasks();
     setTasks(all.filter((t) => t.status === "open" || t.status === "claimed" || t.status === "in_progress"));
     setLoading(false);
   };

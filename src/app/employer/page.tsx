@@ -27,9 +27,10 @@ export default function EmployerDashboard() {
 
   useEffect(() => {
     if (!walletAddress) return;
-    const stored = loadTasks().filter((t) => t.employerAddress === walletAddress);
-    setTasks(stored);
-    setLoading(false);
+    loadTasks().then((all) => {
+      setTasks(all.filter((t) => t.employerAddress === walletAddress));
+      setLoading(false);
+    });
   }, [walletAddress]);
 
   return (

@@ -86,6 +86,7 @@ Employer stakes USDC → Agent submits work → Verification engine validates �
 - Auto-save form drafts (task creation)
 - Demo tasks for testing without escrow
 - **BoundlessClient integration** — `verify → proof → auto-approve` pipeline live with `lib/boundless.ts`
+- **Supabase PostgreSQL** — multi-user database replaces localStorage with async API
 
 ### Planned / In Progress
 
@@ -93,7 +94,6 @@ Employer stakes USDC → Agent submits work → Verification engine validates �
 |-------|------|---------|
 | AI Integration | OpenAI / Anthropic API | Autonomous agent task execution |
 | Decentralized Storage | Pinata / IPFS | Content-addressed proof & artifact storage |
-| Multi-User Database | Supabase | Replace localStorage for persistent multi-user state |
 | Escrow UI Blocks | `@trustless-work/blocks` | Production-grade escrow UI components |
 | UI Components | shadcn/ui | Expand component library |
 | Agent Economy | Token rewards | Incentivize quality AI work at scale |
@@ -112,6 +112,7 @@ Employer stakes USDC → Agent submits work → Verification engine validates �
 | **Wallet Signing** | Freighter browser extension + Albedo web wallet | Production |
 | **Stellar SDK** | `@stellar/stellar-sdk` v15.1.0 | Production |
 | **State** | localStorage (client-side) + on-chain (canonical) | Development |
+| **Database** | Supabase PostgreSQL — multi-user, cross-device task storage | Production |
 | **Verification** | Next.js API route with SHA-256 hashing | Production |
 | **Boundless Client** | `lib/boundless.ts` — typed proof-request client | Production |
 | **Network** | Stellar Testnet | Development |
@@ -148,7 +149,10 @@ src/
     ├── store.ts                          # localStorage CRUD (loadTasks, updateTask, updateMilestone)
     ├── escrowService.ts                  # Escrow SDK wrapper (sign XDR + send transaction)
     ├── boundless.ts                      # BoundlessClient — typed proof-request wrapper
+    ├── supabase.ts                       # Supabase client (PostgreSQL)
     └── demo.ts                           # Pre-built demo tasks for testing
+supabase/
+    └── schema.sql                        # Database schema migration
 ```
 
 ---
@@ -174,9 +178,20 @@ npm install
 
 ```bash
 cp .env.local.example .env.local
-# Edit .env.local and add your Trustless Work API key:
-# NEXT_PUBLIC_TRUSTLESS_API_KEY=your_api_key_here
+# Edit .env.local and add your keys:
+# NEXT_PUBLIC_TRUSTLESS_API_KEY=your_trustless_api_key
+# NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+# NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
+
+### Database Setup (Supabase)
+
+1. Create a project at [supabase.com](https://supabase.com)
+2. Go to **SQL Editor** and run the migration in `supabase/schema.sql`
+3. Copy your project URL and anon key from **Project Settings > API**
+4. Paste them into `.env.local`
+
+> Without Supabase env vars, the app falls back to localStorage automatically.
 
 ### Run
 
@@ -308,6 +323,7 @@ import {
 | Multi-wallet support | ✅ 5 wallets via Stellar Wallets Kit |
 | Deterministic verification | ✅ 6 checks with proof hash generation |
 | Boundless ZK verification | ✅ BoundlessClient with verify→proof→auto-approve pipeline |
+| Multi-user database | ✅ Supabase PostgreSQL with localStorage fallback |
 | AI agent execution | Planned — OpenAI/Anthropic API pending |
 | IPFS proof storage | Planned — Pinata integration pending |
 

@@ -790,6 +790,7 @@ Environment variables required on Vercel:
 - [x] Dark-themed polished UI with role switcher and transaction log
 - [x] Testnet onboarding wizard (XLM funding, USDC trustline)
 - [x] BoundlessClient integration — verify→proof→auto-approve pipeline
+- [x] Supabase PostgreSQL — multi-user database with localStorage fallback
 
 ### Phase 2: Boundless ZK Proofs (Next)
 
@@ -808,7 +809,6 @@ Environment variables required on Vercel:
 
 ### Phase 4: Production Readiness
 
-- [ ] Supabase backend (replace localStorage)
 - [ ] Multi-user accounts + authentication
 - [ ] Stellar mainnet deployment
 - [ ] shadcn/ui component migration
@@ -846,7 +846,10 @@ src/
 │   ├── store.ts                          — localStorage persistence
 │   ├── escrowService.ts                  — Escrow SDK wrapper
 │   ├── boundless.ts                      — BoundlessClient proof-request wrapper
+│   ├── supabase.ts                       — Supabase client (PostgreSQL)
 │   └── demo.ts                           — Demo task data
+└── supabase/
+    └── schema.sql                        — Database migration
 └── middleware / config files
     ├── next.config.ts
     ├── tsconfig.json
