@@ -124,8 +124,13 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const storedAddress = localStorage.getItem("walletAddress");
     const storedName = localStorage.getItem("walletName");
-    if (storedAddress) setWalletAddress(storedAddress);
-    if (storedName) setWalletName(storedName);
+    if (storedAddress) {
+      setWalletAddress(storedAddress);
+      setWalletName(storedName);
+      StellarWalletsKit.init({
+        modules: [freighterModule, albedoModule],
+      });
+    }
   }, []);
 
   const setWalletInfo = useCallback((address: string, name: string) => {
@@ -169,6 +174,13 @@ export const useWallet = () => {
 
   const signTransaction = useCallback(
     async (unsignedTransaction: string, address: string): Promise<string> => {
+      try {
+        StellarWalletsKit.init({
+          modules: [freighterModule, albedoModule],
+        });
+      } catch {
+        // Kit may already be initialized; proceed
+      }
       const { signedTxXdr } = await StellarWalletsKit.signTransaction(
         unsignedTransaction,
         { address, networkPassphrase: "Test SDF Network ; September 2015" }
