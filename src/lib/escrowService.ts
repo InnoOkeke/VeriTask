@@ -82,11 +82,18 @@ export const useEscrowService = () => {
     if (!milestones[milestoneIndex]) throw new Error("Milestone not found");
     milestones[milestoneIndex] = { ...milestones[milestoneIndex], receiver: agentAddress };
 
-    const { contractId: _cid, signer: _sig, balance: _bal, ...cleanEscrow } = escrowData as Record<string, unknown>;
+    const d = escrowData as Record<string, unknown>;
+    const cleanEscrow: Record<string, unknown> = {};
+    const allowed = ["engagementId", "title", "description", "platformFee", "trustline", "roles", "milestones", "isActive"];
+    for (const key of allowed) {
+      if (key === "milestones") continue;
+      if (d[key] !== undefined) cleanEscrow[key] = d[key];
+    }
+    cleanEscrow.milestones = milestones;
 
     const unsigned = await updateEscrow({
       contractId,
-      escrow: { ...cleanEscrow, milestones },
+      escrow: cleanEscrow,
       signer,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any, "multi-release");
