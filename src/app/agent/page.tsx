@@ -12,7 +12,7 @@ export default function AgentBoard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const stored = loadTasks().filter((t) => t.status === "open" || t.status === "claimed");
+    const stored = loadTasks().filter((t) => t.status === "open" || t.status === "claimed" || t.status === "in_progress");
     setTasks(stored);
     setLoading(false);
   }, []);

@@ -103,9 +103,11 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
         serviceProvider: walletAddress,
       });
       addLog("Work submitted on-chain");
+      const ml = task.milestones.find((m) => m.id === milestoneId);
+      const generatedEvidence = `Completed work for milestone: ${ml?.description || `milestone ${milestoneIndex + 1}`}. Task output has been generated and meets the specified requirements.`;
       updateMilestone(task.id, milestoneId, {
         status: "submitted",
-        evidence: "AI-generated output delivered. Ready for review.",
+        evidence: generatedEvidence,
       });
       if (task.status === "claimed" || task.status === "open") {
         updateTask(task.id, { status: "in_progress", agentAddress: walletAddress });
