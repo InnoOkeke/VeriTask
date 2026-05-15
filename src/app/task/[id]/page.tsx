@@ -148,7 +148,16 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
       }
       refresh();
     } catch (err) {
-      addLog(`Error: ${err instanceof Error ? err.message : String(err)}`);
+      let msg = err instanceof Error ? err.message : String(err);
+      if (err && typeof err === "object" && "response" in err) {
+        const r = (err as Record<string, unknown>).response as Record<string, unknown> | undefined;
+        if (r?.data && typeof r.data === "object") {
+          const d = r.data as Record<string, unknown>;
+          if (typeof d.message === "string") msg = d.message;
+          else if (typeof d.error === "string") msg = d.error;
+        }
+      }
+      addLog(`Error: ${msg}`);
     }
     setBusy(false);
   };
@@ -176,7 +185,16 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
       }
       refresh();
     } catch (err) {
-      addLog(`Error: ${err instanceof Error ? err.message : String(err)}`);
+      let msg = err instanceof Error ? err.message : String(err);
+      if (err && typeof err === "object" && "response" in err) {
+        const r = (err as Record<string, unknown>).response as Record<string, unknown> | undefined;
+        if (r?.data && typeof r.data === "object") {
+          const d = r.data as Record<string, unknown>;
+          if (typeof d.message === "string") msg = d.message;
+          else if (typeof d.error === "string") msg = d.error;
+        }
+      }
+      addLog(`Error: ${msg}`);
     }
     setBusy(false);
   };
