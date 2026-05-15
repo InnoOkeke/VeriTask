@@ -11,23 +11,7 @@ function getSetupKey(address: string): string {
   return `veritask_setup_${address}`;
 }
 
-async function getUsdcBalance(address: string): Promise<string> {
-  try {
-    const resp = await fetch(`${HORIZON}/accounts/${address}`);
-    if (!resp.ok) return "0";
-    const data = await resp.json();
-    const usdc = data.balances?.find(
-      (b: { asset_code?: string; asset_issuer?: string }) =>
-        b.asset_code === "USDC" && b.asset_issuer === USDC_ISSUER
-    );
-    return usdc?.balance || "0";
-  } catch {
-    return "0";
-  }
-}
 async function hasTrustline(address: string): Promise<boolean> {
-  const bal = await getUsdcBalance(address);
-  // If we can query the account, the trustline exists (balance can be 0)
   try {
     const resp = await fetch(`${HORIZON}/accounts/${address}`);
     if (!resp.ok) return false;
@@ -48,7 +32,6 @@ export function WalletSetupBanner() {
   const [needsSetup, setNeedsSetup] = useState(true);
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
   const [dismissed, setDismissed] = useState(false);
-  const [usdcBalance, setUsdcBalance] = useState("0");
 
   // Check if trustline exists on mount / wallet change
   useEffect(() => {
@@ -67,8 +50,7 @@ export function WalletSetupBanner() {
 
     // Verify on-chain
     setChecking(true);
-    Promise.all([hasTrustline(publicKey), getUsdcBalance(publicKey)]).then(([has, bal]) => {
-      setUsdcBalance(bal);
+    hasTrustline(publicKey).then((has) => {
       if (has) {
         localStorage.setItem(key, "done");
       }
@@ -172,16 +154,16 @@ export function WalletSetupBanner() {
 
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-xs text-zinc-300 font-medium">3. Get testnet USDC</p>
+                  <p className="text-xs text-zinc-300 font-medium">3. Get Soroban USDC</p>
                   <p className="text-[11px] text-zinc-500">
-                    Balance: {usdcBalance} USDC —{" "}
+                    You need Soroban-based USDC, not classic Stellar USDC.{" "}
                     <a
                       href="https://docs.trustlesswork.com/trustless-work/introduction/stellar-and-soroban-the-backbone-of-trustless-work/testnet-tokens"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-amber-400 hover:underline"
                     >
-                      Get tokens →
+                      Get testnet tokens →
                     </a>
                   </p>
                 </div>

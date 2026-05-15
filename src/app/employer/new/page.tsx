@@ -57,6 +57,7 @@ export default function CreateTask() {
   const [deploying, setDeploying] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+  const PLATFORM_FEE = 2;
 
   // Auto-save to localStorage on every change
   useEffect(() => {
@@ -93,7 +94,6 @@ export default function CreateTask() {
     setError("");
 
     const engagementId = `eng-${Date.now()}`;
-    const PLATFORM_FEE = 2;
 
     try {
       const result = await escrow.deploy({
@@ -125,25 +125,6 @@ export default function CreateTask() {
       // Soroban contracts use C... addresses — wait for tx finality
       setStatus("Escrow deployed. Waiting for network confirmation...");
       await new Promise((r) => setTimeout(r, 8000));
-
-      // Check USDC balance before funding
-      setStatus("Checking USDC balance...");
-      const usdcIssuer = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
-      const horizon = "https://horizon-testnet.stellar.org";
-      const balResp = await fetch(`${horizon}/accounts/${publicKey}`);
-      const balData = await balResp.json();
-      const usdcBalance = balData.balances?.find(
-        (b: { asset_code?: string; asset_issuer?: string }) =>
-          b.asset_code === "USDC" && b.asset_issuer === usdcIssuer
-      );
-      const balance = parseFloat(usdcBalance?.balance || "0");
-      const needed = totalAmount + PLATFORM_FEE;
-
-      if (balance < needed) {
-        throw new Error(
-          `Insufficient USDC: have ${balance} USDC, need ${needed} USDC. Get testnet USDC at https://docs.trustlesswork.com/trustless-work/introduction/stellar-and-soroban-the-backbone-of-trustless-work/testnet-tokens`
-        );
-      }
 
       setStatus("Funding escrow...");
 
@@ -317,9 +298,20 @@ export default function CreateTask() {
           <div className="flex items-center justify-between p-4 rounded-xl border border-violet-500/20 bg-violet-500/5">
             <span className="text-sm text-zinc-300">Total Escrow Amount</span>
             <span className="text-lg font-bold text-violet-400">
-              {totalAmount} USDC
+              {totalAmount + PLATFORM_FEE} USDC
             </span>
           </div>
+          <p className="text-[11px] text-zinc-600 -mt-4">
+            Includes {PLATFORM_FEE} USDC platform fee. Requires Soroban USDC.{" "}
+            <a
+              href="https://docs.trustlesswork.com/trustless-work/introduction/stellar-and-soroban-the-backbone-of-trustless-work/testnet-tokens"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-amber-400 hover:underline"
+            >
+              Get testnet tokens →
+            </a>
+          </p>
 
           <button
             type="submit"
