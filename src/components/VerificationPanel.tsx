@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { BoundlessClient } from "@/lib/boundless";
 
 interface CheckResult {
   name: string;
@@ -56,10 +57,10 @@ export function VerificationPanel({
         .filter((w) => w.length > 3)
         .slice(0, 5);
 
-      const res = await fetch("/api/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const client = new BoundlessClient({ network: "testnet" });
+      const data = await client.requestProof({
+        program: "ai-output-validator",
+        inputs: {
           output: evidence || "",
           requirements: {
             description: milestoneDescription,
@@ -69,15 +70,9 @@ export function VerificationPanel({
           },
           taskId,
           milestoneIndex,
-        }),
+        },
       });
 
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Verification request failed");
-      }
-
-      const data: VerifyResponse = await res.json();
       setResult(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Verification error");

@@ -235,7 +235,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                       evidence={m.evidence}
                       taskId={task.id}
                       milestoneIndex={i}
-                      onVerified={() => { updateMilestone(task.id, m.id, { status: "approved" }); refresh(); }}
+                      onVerified={() => { handleApprove(m.id, i); }}
                       disabled={busy}
                     />
                   ) : null}

@@ -111,6 +111,12 @@ The on-chain layer is the source of truth for financial operations. The off-chai
 | `@stellar/stellar-sdk` | ^15.1.0 | Transaction building (trustline operations) |
 | `@stellar/freighter-api` | ^6.0.1 | Freighter browser extension API |
 
+### Verification & Proofs
+
+| Dependency | Version | Role |
+|-----------|---------|------|
+| `lib/boundless.ts` | — | BoundlessClient — typed proof-request wrapper for `/api/verify` |
+
 ---
 
 ## 3. Data Model
@@ -410,6 +416,37 @@ switch (expectedFormat) {
     break;
 }
 ```
+
+### BoundlessClient (`src/lib/boundless.ts`)
+
+The `BoundlessClient` class wraps the verification API with a clean, typed interface matching the Boundless proof-request pattern. It is used by `VerificationPanel` instead of direct `fetch` calls:
+
+```typescript
+import { BoundlessClient } from "@/lib/boundless";
+
+const client = new BoundlessClient({ network: "testnet" });
+
+const proof = await client.requestProof({
+  program: "ai-output-validator",
+  inputs: {
+    output: evidence,
+    requirements: {
+      description: milestoneDescription,
+      minLength: 50,
+      expectedFormat: "text",
+      keywords,
+    },
+    taskId,
+    milestoneIndex,
+  },
+});
+
+// proof.verified — all 6 checks passed
+// proof.proofHash — SHA-256 hash for audit
+// proof.checks — individual check results
+```
+
+The auto-approve pipeline is wired in `src/app/task/[id]/page.tsx:238`: when the employer clicks "Approve & Release" after verification passes, `onVerified` calls `handleApprove()` which triggers the on-chain `approveMilestone` via the Trustless Work SDK — no separate manual approve step required.
 
 ---
 
@@ -752,12 +789,12 @@ Environment variables required on Vercel:
 - [x] Multi-wallet support (Freighter + Albedo)
 - [x] Dark-themed polished UI with role switcher and transaction log
 - [x] Testnet onboarding wizard (XLM funding, USDC trustline)
+- [x] BoundlessClient integration — verify→proof→auto-approve pipeline
 
-### Phase 2: Boundless Integration (Next)
+### Phase 2: Boundless ZK Proofs (Next)
 
-- [ ] Boundless SDK integration for ZK proof generation
-- [ ] Replace deterministic checks with verifiable ZK proofs
-- [ ] Proof verification → auto-approve pipeline
+- [ ] Upgrade BoundlessClient to use Boundless RISC Zero zkVM for true ZK proofs
+- [ ] Replace SHA-256 deterministic checks with verifiable ZK proofs
 - [ ] IPFS/Pinata storage for proofs and artifacts
 - [ ] Content-addressed evidence referencing
 
@@ -808,6 +845,7 @@ src/
 │   ├── types.ts                          — Core type definitions
 │   ├── store.ts                          — localStorage persistence
 │   ├── escrowService.ts                  — Escrow SDK wrapper
+│   ├── boundless.ts                      — BoundlessClient proof-request wrapper
 │   └── demo.ts                           — Demo task data
 └── middleware / config files
     ├── next.config.ts

@@ -55,6 +55,9 @@ export default function AgentBoard() {
                           {task.escrowContractId.slice(0, 10)}...
                         </span>
                       ) : null}
+                      <span className="text-[11px] text-zinc-600 font-mono">
+                        {task.employerAddress.slice(0, 8)}...
+                      </span>
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-2">
