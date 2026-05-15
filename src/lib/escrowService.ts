@@ -29,7 +29,14 @@ export const useEscrowService = () => {
 
   const handleDeploy = async (payload: InitializeMultiReleaseEscrowPayload): Promise<InitializeMultiReleaseEscrowResponse> => {
     const unsigned = await deployEscrow(payload, "multi-release");
-    const signedXdr = await signTransaction(unsigned.unsignedTransaction!, payload.signer);
+    if (!unsigned?.unsignedTransaction) {
+      const errData = JSON.stringify(unsigned);
+      throw new Error(`Escrow API returned no unsigned transaction. Response: ${errData}`);
+    }
+    const signedXdr = await signTransaction(unsigned.unsignedTransaction, payload.signer);
+    if (!signedXdr) {
+      throw new Error("Wallet signing returned empty XDR");
+    }
     const result = await sendTransaction(signedXdr);
     return result as InitializeMultiReleaseEscrowResponse;
   };

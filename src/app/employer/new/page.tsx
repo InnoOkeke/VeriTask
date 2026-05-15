@@ -89,12 +89,13 @@ export default function CreateTask() {
     if (!title || !description || milestones.some((m) => !m.description || !m.amount)) return;
 
     setDeploying(true);
-    setStatus("Deploying escrow on Stellar Testnet...");
     setError("");
 
     const engagementId = `eng-${Date.now()}`;
+    let contractId = "";
 
     try {
+      setStatus("Step 1/3: Requesting escrow deployment from Trustless Work API...");
       const result = await handleDeploy({
         signer: walletAddress,
         engagementId,
@@ -119,13 +120,15 @@ export default function CreateTask() {
         },
       });
 
-      const contractId = result.contractId;
+      contractId = result.contractId;
+      if (!contractId) {
+        throw new Error("Escrow deployed but no contract ID returned from API");
+      }
 
-      setStatus("Escrow deployed. Waiting for network confirmation...");
+      setStatus("Step 2/3: Waiting for Stellar network confirmation (8s)...");
       await new Promise((r) => setTimeout(r, 8000));
 
-      setStatus("Funding escrow...");
-
+      setStatus("Step 3/3: Funding escrow with USDC...");
       await handleFund({
         contractId,
         signer: walletAddress,
@@ -156,7 +159,25 @@ export default function CreateTask() {
       setStatus("Task created and escrow funded!");
       setTimeout(() => router.push("/employer"), 1500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Deploy failed");
+      let msg = "";
+      if (err && typeof err === "object") {
+        const e = err as Record<string, unknown>;
+        if (typeof e.message === "string" && e.message) msg = e.message;
+        if (e.response && typeof e.response === "object") {
+          const r = e.response as Record<string, unknown>;
+          if (r.data && typeof r.data === "object") {
+            const d = r.data as Record<string, unknown>;
+            if (typeof d.message === "string") msg = d.message;
+            else if (typeof d.error === "string") msg = d.error;
+            else msg = JSON.stringify(d);
+          } else if (typeof r.status === "number") {
+            msg = `API error ${r.status}: ${msg}`;
+          }
+        }
+      }
+      if (!msg) msg = "Unknown error during deployment";
+      console.error("Deploy failed:", err);
+      setError(`Deploy failed: ${msg}`);
     } finally {
       setDeploying(false);
     }
