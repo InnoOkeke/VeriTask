@@ -260,7 +260,12 @@ export default function TaskDetailPage({
                     <VerificationPanel
                       milestoneDescription={m.description}
                       evidence={m.evidence}
-                      onVerified={() => handleApprove(m.id, i)}
+                      taskId={task.id}
+                      milestoneIndex={i}
+                      onVerified={(proofHash) => {
+                        updateMilestone(task.id, m.id, { status: "approved" });
+                        refresh();
+                      }}
                       disabled={busy}
                     />
                   )}
