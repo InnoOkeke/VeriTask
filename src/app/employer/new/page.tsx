@@ -160,6 +160,7 @@ export default function CreateTask() {
         })),
         employerAddress: walletAddress,
         escrowContractId: contractId,
+        escrowData: (result as Record<string, unknown>).escrow as Record<string, unknown> | undefined,
         engagementId,
         createdAt: new Date(),
       };

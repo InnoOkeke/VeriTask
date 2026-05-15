@@ -8,6 +8,7 @@ import {
   useChangeMilestoneStatus,
   useReleaseFunds,
   useSendTransaction,
+  useUpdateEscrow,
 } from "@trustless-work/escrow/hooks";
 import type {
   InitializeMultiReleaseEscrowPayload,
@@ -16,6 +17,7 @@ import type {
   ApproveMilestonePayload,
   ChangeMilestoneStatusPayload,
   MultiReleaseReleaseFundsPayload,
+  UpdateMultiReleaseEscrowPayload,
 } from "@trustless-work/escrow";
 
 export const useEscrowService = () => {
@@ -26,6 +28,7 @@ export const useEscrowService = () => {
   const { approveMilestone } = useApproveMilestone();
   const { releaseFunds } = useReleaseFunds();
   const { sendTransaction } = useSendTransaction();
+  const { updateEscrow } = useUpdateEscrow();
 
   const handleDeploy = async (payload: InitializeMultiReleaseEscrowPayload): Promise<InitializeMultiReleaseEscrowResponse> => {
     const unsigned = await deployEscrow(payload, "multi-release");
@@ -33,8 +36,8 @@ export const useEscrowService = () => {
       throw new Error(`Escrow API returned no unsigned transaction. Response: ${JSON.stringify(unsigned)}`);
     }
     const signedXdr = await signTransaction(unsigned.unsignedTransaction, payload.signer);
-    const result = await sendTransaction(signedXdr);
-    return result as InitializeMultiReleaseEscrowResponse;
+    const result = await sendTransaction(signedXdr) as InitializeMultiReleaseEscrowResponse;
+    return result;
   };
 
   const handleFund = async (payload: FundEscrowPayload) => {
@@ -61,11 +64,50 @@ export const useEscrowService = () => {
     return sendTransaction(signedXdr);
   };
 
+  const handleUpdateMilestoneReceiver = async (
+    contractId: string,
+    milestoneIndex: number,
+    agentAddress: string,
+    signer: string,
+    storedEscrow: Record<string, unknown>
+  ) => {
+    const r = storedEscrow.roles as Record<string, string>;
+    const tl = storedEscrow.trustline as Record<string, string>;
+    const milestones = [...(storedEscrow.milestones as Record<string, unknown>[])];
+    milestones[milestoneIndex] = { ...milestones[milestoneIndex], receiver: agentAddress };
+
+    const payload: UpdateMultiReleaseEscrowPayload = {
+      contractId,
+      signer,
+      escrow: {
+        engagementId: storedEscrow.engagementId as string,
+        title: storedEscrow.title as string,
+        description: storedEscrow.description as string,
+        platformFee: storedEscrow.platformFee as number,
+        roles: {
+          approver: r.approver,
+          serviceProvider: r.serviceProvider,
+          platformAddress: r.platformAddress,
+          releaseSigner: r.releaseSigner,
+          disputeResolver: r.disputeResolver,
+        },
+        milestones: milestones as UpdateMultiReleaseEscrowPayload["escrow"]["milestones"],
+        trustline: { symbol: tl.symbol, address: tl.address },
+        isActive: true,
+      },
+    };
+
+    const unsigned = await updateEscrow(payload, "multi-release");
+    const signedXdr = await signTransaction(unsigned.unsignedTransaction!, signer);
+    return sendTransaction(signedXdr);
+  };
+
   return {
     handleDeploy,
     handleFund,
     handleChangeMilestoneStatus,
     handleApproveMilestone,
     handleReleaseFunds,
+    handleUpdateMilestoneReceiver,
   };
 };
