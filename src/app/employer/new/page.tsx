@@ -58,6 +58,7 @@ export default function CreateTask() {
     setError("");
 
     const engagementId = `eng-${Date.now()}`;
+    const PLATFORM_FEE = 2;
 
     try {
       const result = await escrow.deploy({
@@ -65,7 +66,7 @@ export default function CreateTask() {
         engagementId,
         title,
         description,
-        platformFee: 2,
+        platformFee: PLATFORM_FEE,
         roles: {
           approver: publicKey,
           serviceProvider: publicKey,
@@ -94,7 +95,7 @@ export default function CreateTask() {
       await escrow.fund({
         contractId,
         signer: publicKey,
-        amount: totalAmount,
+        amount: totalAmount + PLATFORM_FEE,
       });
 
       const task: Task = {
