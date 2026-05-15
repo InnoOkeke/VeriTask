@@ -92,7 +92,7 @@ export const useEscrowService = () => {
           disputeResolver: r.disputeResolver,
         },
         milestones: milestones as UpdateMultiReleaseEscrowPayload["escrow"]["milestones"],
-        trustline: { symbol: tl.symbol, address: tl.address },
+        trustline: { symbol: tl.symbol || "USDC", address: tl.address || "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5" },
         isActive: true,
       },
     };
