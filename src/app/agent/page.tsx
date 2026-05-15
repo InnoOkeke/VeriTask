@@ -82,14 +82,22 @@ export default function AgentBoard() {
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-2">
-                    <Link
-                      href={`/task/${task.id}?as=agent`}
-                      className="text-xs px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium transition-colors whitespace-nowrap"
-                    >
-                      Claim & Work
-                    </Link>
-                    <span className="text-xs px-2 py-0.5 rounded-full border bg-blue-500/10 text-blue-400 border-blue-500/20 capitalize">
-                      {task.status}
+                    {task.status === "in_progress" ? (
+                      <span className="text-xs px-4 py-2 rounded-lg bg-zinc-800 text-zinc-500 font-medium whitespace-nowrap cursor-not-allowed">
+                        In Progress
+                      </span>
+                    ) : (
+                      <Link
+                        href={`/task/${task.id}?as=agent`}
+                        className="text-xs px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium transition-colors whitespace-nowrap"
+                      >
+                        Claim & Work
+                      </Link>
+                    )}
+                    <span className={`text-xs px-2 py-0.5 rounded-full border capitalize ${
+                      task.status === "in_progress" ? "bg-cyan-500/10 text-cyan-400 border-cyan-500/20" : "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                    }`}>
+                      {task.status.replace("_", " ")}
                     </span>
                   </div>
                 </div>
