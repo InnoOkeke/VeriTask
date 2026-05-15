@@ -87,10 +87,29 @@ export default function CreateTask() {
 
       const contractId = result.contractId;
 
-      setStatus("Escrow deployed. Funding...");
+      setStatus("Escrow deployed. Waiting for confirmation...");
 
-      // Wait for contract to confirm on-chain before funding
-      await new Promise((r) => setTimeout(r, 5000));
+      // Poll Horizon until contract is visible or timeout
+      const horizon = "https://horizon-testnet.stellar.org";
+      let confirmed = false;
+      for (let i = 0; i < 20; i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        try {
+          const check = await fetch(`${horizon}/accounts/${contractId}`);
+          if (check.ok) {
+            confirmed = true;
+            break;
+          }
+        } catch {
+          // Not found yet, keep polling
+        }
+      }
+
+      if (!confirmed) {
+        throw new Error("Escrow contract not confirmed on-chain after 40 seconds. Try again.");
+      }
+
+      setStatus("Escrow confirmed. Funding...");
 
       await escrow.fund({
         contractId,

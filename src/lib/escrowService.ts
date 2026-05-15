@@ -21,6 +21,14 @@ import type {
   GetEscrowsFromIndexerBySignerParams,
 } from "@trustless-work/escrow";
 
+function extractError(err: unknown): string {
+  const e = err as { response?: { data?: unknown; status?: number }; message?: string };
+  if (e.response?.data) {
+    return `API ${e.response.status || "error"}: ${JSON.stringify(e.response.data)}`;
+  }
+  return e.message || String(err);
+}
+
 export function useEscrowService() {
   const { signXdr } = useWallet();
   const { deployEscrow } = useInitializeEscrow();
@@ -38,51 +46,71 @@ export function useEscrowService() {
 
   return {
     deploy: async (payload: InitializeMultiReleaseEscrowPayload) => {
-      const res = await deployEscrow(payload, "multi-release" as EscrowType);
-      if (res.status !== "SUCCESS" || !res.unsignedTransaction) {
-        throw new Error(`Deploy failed: ${JSON.stringify(res)}`);
+      try {
+        const res = await deployEscrow(payload, "multi-release" as EscrowType);
+        if (res.status !== "SUCCESS" || !res.unsignedTransaction) {
+          throw new Error(`Deploy failed: ${JSON.stringify(res)}`);
+        }
+        const txRes = await signAndSend(res.unsignedTransaction);
+        if (txRes.status !== "SUCCESS") {
+          throw new Error(`Deploy tx failed: ${JSON.stringify(txRes)}`);
+        }
+        const initRes = txRes as InitializeMultiReleaseEscrowResponse;
+        if (!initRes.contractId) {
+          throw new Error(`No contractId in response: ${JSON.stringify(txRes)}`);
+        }
+        return initRes;
+      } catch (err) {
+        throw new Error(`Deploy error: ${extractError(err)}`);
       }
-      const txRes = await signAndSend(res.unsignedTransaction);
-      if (txRes.status !== "SUCCESS") {
-        throw new Error(`Deploy tx failed: ${JSON.stringify(txRes)}`);
-      }
-      const initRes = txRes as InitializeMultiReleaseEscrowResponse;
-      if (!initRes.contractId) {
-        throw new Error(`No contractId in response: ${JSON.stringify(txRes)}`);
-      }
-      return initRes;
     },
 
     fund: async (payload: FundEscrowPayload) => {
-      const res = await fundEscrow(payload, "multi-release" as EscrowType);
-      if (res.status !== "SUCCESS" || !res.unsignedTransaction) {
-        throw new Error(`Fund failed: ${JSON.stringify(res)}`);
+      try {
+        const res = await fundEscrow(payload, "multi-release" as EscrowType);
+        if (res.status !== "SUCCESS" || !res.unsignedTransaction) {
+          throw new Error(`Fund failed: ${JSON.stringify(res)}`);
+        }
+        return signAndSend(res.unsignedTransaction);
+      } catch (err) {
+        throw new Error(`Fund error: ${extractError(err)}`);
       }
-      return signAndSend(res.unsignedTransaction);
     },
 
     approve: async (payload: ApproveMilestonePayload) => {
-      const res = await approveMilestone(payload, "multi-release" as EscrowType);
-      if (res.status !== "SUCCESS" || !res.unsignedTransaction) {
-        throw new Error("Failed to approve milestone");
+      try {
+        const res = await approveMilestone(payload, "multi-release" as EscrowType);
+        if (res.status !== "SUCCESS" || !res.unsignedTransaction) {
+          throw new Error(`Approve failed: ${JSON.stringify(res)}`);
+        }
+        return signAndSend(res.unsignedTransaction);
+      } catch (err) {
+        throw new Error(`Approve error: ${extractError(err)}`);
       }
-      return signAndSend(res.unsignedTransaction);
     },
 
     changeStatus: async (payload: ChangeMilestoneStatusPayload) => {
-      const res = await changeMilestoneStatus(payload, "multi-release" as EscrowType);
-      if (res.status !== "SUCCESS" || !res.unsignedTransaction) {
-        throw new Error("Failed to change milestone status");
+      try {
+        const res = await changeMilestoneStatus(payload, "multi-release" as EscrowType);
+        if (res.status !== "SUCCESS" || !res.unsignedTransaction) {
+          throw new Error(`Status change failed: ${JSON.stringify(res)}`);
+        }
+        return signAndSend(res.unsignedTransaction);
+      } catch (err) {
+        throw new Error(`Status error: ${extractError(err)}`);
       }
-      return signAndSend(res.unsignedTransaction);
     },
 
     release: async (payload: MultiReleaseReleaseFundsPayload) => {
-      const res = await releaseFunds(payload, "multi-release" as EscrowType);
-      if (res.status !== "SUCCESS" || !res.unsignedTransaction) {
-        throw new Error("Failed to release funds");
+      try {
+        const res = await releaseFunds(payload, "multi-release" as EscrowType);
+        if (res.status !== "SUCCESS" || !res.unsignedTransaction) {
+          throw new Error(`Release failed: ${JSON.stringify(res)}`);
+        }
+        return signAndSend(res.unsignedTransaction);
+      } catch (err) {
+        throw new Error(`Release error: ${extractError(err)}`);
       }
-      return signAndSend(res.unsignedTransaction);
     },
 
     getEscrows: async (params: GetEscrowsFromIndexerBySignerParams) => {
