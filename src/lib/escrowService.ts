@@ -11,6 +11,7 @@ import {
 } from "@trustless-work/escrow/hooks";
 import type {
   InitializeMultiReleaseEscrowPayload,
+  InitializeMultiReleaseEscrowResponse,
   FundEscrowPayload,
   ApproveMilestonePayload,
   ChangeMilestoneStatusPayload,
@@ -18,7 +19,7 @@ import type {
 } from "@trustless-work/escrow";
 
 export const useEscrowService = () => {
-  const { walletAddress, signTransaction } = useWallet();
+  const { signTransaction } = useWallet();
   const { deployEscrow } = useInitializeEscrow();
   const { fundEscrow } = useFundEscrow();
   const { changeMilestoneStatus } = useChangeMilestoneStatus();
@@ -26,11 +27,11 @@ export const useEscrowService = () => {
   const { releaseFunds } = useReleaseFunds();
   const { sendTransaction } = useSendTransaction();
 
-  const handleDeploy = async (payload: InitializeMultiReleaseEscrowPayload) => {
+  const handleDeploy = async (payload: InitializeMultiReleaseEscrowPayload): Promise<InitializeMultiReleaseEscrowResponse> => {
     const unsigned = await deployEscrow(payload, "multi-release");
     const signedXdr = await signTransaction(unsigned.unsignedTransaction!, payload.signer);
     const result = await sendTransaction(signedXdr);
-    return result;
+    return result as InitializeMultiReleaseEscrowResponse;
   };
 
   const handleFund = async (payload: FundEscrowPayload) => {
