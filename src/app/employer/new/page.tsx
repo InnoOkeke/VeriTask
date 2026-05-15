@@ -51,17 +51,13 @@ export default function CreateTask() {
   const { walletAddress } = useWallet();
   const { handleDeploy, handleFund } = useEscrowService();
 
-  const draft = loadDraft();
-  const [title, setTitle] = useState(draft?.title || "");
-  const [description, setDescription] = useState(draft?.description || "");
-  const [milestones, setMilestones] = useState<NewMilestone[]>(
-    draft?.milestones?.length ? draft.milestones : [{ id: "m1", description: "", amount: 0 }]
-  );
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [milestones, setMilestones] = useState<NewMilestone[]>([{ id: "m1", description: "", amount: 0 }]);
   const [deploying, setDeploying] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
-
-  saveDraft({ title, description, milestones });
+  const [draftAvailable, setDraftAvailable] = useState(!!loadDraft());
 
   const addMilestone = () => {
     setMilestones((prev) => [
@@ -82,6 +78,20 @@ export default function CreateTask() {
   };
 
   const totalAmount = milestones.reduce((sum, m) => sum + (m.amount || 0), 0);
+
+  const loadDraftForm = () => {
+    const saved = loadDraft();
+    if (!saved) return;
+    setTitle(saved.title || "");
+    setDescription(saved.description || "");
+    setMilestones(saved.milestones?.length ? saved.milestones : [{ id: "m1", description: "", amount: 0 }]);
+    setDraftAvailable(false);
+  };
+
+  const dismissDraft = () => {
+    clearDraft();
+    setDraftAvailable(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -198,20 +208,27 @@ export default function CreateTask() {
         <p className="text-zinc-400 text-sm mb-1">
           Define milestones. An escrow is deployed on Stellar — funds release only when each milestone is verified.
         </p>
-        {(draft && (draft.title || draft.description)) ? (
-          <p className="text-xs text-zinc-600 mb-6">
-            Form auto-saved.{" "}
-            <button
-              type="button"
-              onClick={() => { clearDraft(); setTitle(""); setDescription(""); setMilestones([{ id: "m1", description: "", amount: 0 }]); }}
-              className="text-zinc-500 hover:text-red-400 transition-colors underline"
-            >
-              Clear draft
-            </button>
-          </p>
-        ) : (
-          <p className="text-xs text-zinc-600 mb-6">Form auto-saves to this device.</p>
-        )}
+        {draftAvailable ? (
+          <div className="mb-6 p-3 rounded-xl border border-amber-500/20 bg-amber-500/5 flex items-center justify-between gap-4">
+            <p className="text-xs text-amber-300/80">You have a saved draft from a previous session.</p>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                type="button"
+                onClick={loadDraftForm}
+                className="text-xs px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-medium transition-colors"
+              >
+                Load Draft
+              </button>
+              <button
+                type="button"
+                onClick={dismissDraft}
+                className="text-xs text-zinc-500 hover:text-red-400 transition-colors"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         {status ? (
           <div className="mb-6 p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 text-sm text-emerald-400">
