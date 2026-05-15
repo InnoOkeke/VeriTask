@@ -126,6 +126,25 @@ export default function CreateTask() {
       setStatus("Escrow deployed. Waiting for network confirmation...");
       await new Promise((r) => setTimeout(r, 8000));
 
+      // Check USDC balance before funding
+      setStatus("Checking USDC balance...");
+      const usdcIssuer = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
+      const horizon = "https://horizon-testnet.stellar.org";
+      const balResp = await fetch(`${horizon}/accounts/${publicKey}`);
+      const balData = await balResp.json();
+      const usdcBalance = balData.balances?.find(
+        (b: { asset_code?: string; asset_issuer?: string }) =>
+          b.asset_code === "USDC" && b.asset_issuer === usdcIssuer
+      );
+      const balance = parseFloat(usdcBalance?.balance || "0");
+      const needed = totalAmount + PLATFORM_FEE;
+
+      if (balance < needed) {
+        throw new Error(
+          `Insufficient USDC: have ${balance} USDC, need ${needed} USDC. Get testnet USDC at https://docs.trustlesswork.com/trustless-work/introduction/stellar-and-soroban-the-backbone-of-trustless-work/testnet-tokens`
+        );
+      }
+
       setStatus("Funding escrow...");
 
       await escrow.fund({
