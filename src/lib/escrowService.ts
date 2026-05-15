@@ -73,7 +73,7 @@ export const useEscrowService = () => {
   ) => {
     const result = await getEscrowByContractIds({
       contractIds: [contractId],
-      validateOnChain: true,
+      validateOnChain: false,
     });
     const escrowData = Array.isArray(result) ? result[0] : result;
     if (!escrowData) throw new Error("Escrow not found on-chain");
@@ -82,9 +82,11 @@ export const useEscrowService = () => {
     if (!milestones[milestoneIndex]) throw new Error("Milestone not found");
     milestones[milestoneIndex] = { ...milestones[milestoneIndex], receiver: agentAddress };
 
+    const { contractId: _cid, signer: _sig, balance: _bal, ...cleanEscrow } = escrowData as Record<string, unknown>;
+
     const unsigned = await updateEscrow({
       contractId,
-      escrow: { ...escrowData, milestones },
+      escrow: { ...cleanEscrow, milestones },
       signer,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any, "multi-release");
