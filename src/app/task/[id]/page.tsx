@@ -28,7 +28,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   const { id } = use(params);
   const router = useRouter();
   const { walletAddress } = useWallet();
-  const { handleApproveMilestone, handleReleaseFunds, handleChangeMilestoneStatus } = useEscrowService();
+  const { handleApproveMilestone, handleReleaseFunds, handleUpdateMilestoneReceiver } = useEscrowService();
   const searchParams = useSearchParams();
   const defaultRole = searchParams.get("as") === "agent" ? "agent" : "employer";
   const [role, setRole] = useState<"employer" | "agent">(defaultRole);
@@ -134,6 +134,16 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
     setBusy(true);
     addLog(`Releasing payment for milestone ${milestoneIndex + 1}...`);
     try {
+      if (task.agentAddress && task.agentAddress !== walletAddress) {
+        addLog(`Updating receiver to agent address...`);
+        await handleUpdateMilestoneReceiver(
+          task.escrowContractId,
+          milestoneIndex,
+          task.agentAddress,
+          walletAddress
+        );
+        addLog("Receiver updated on-chain");
+      }
       await handleReleaseFunds({
         contractId: task.escrowContractId,
         milestoneIndex: String(milestoneIndex),

@@ -8,6 +8,8 @@ import {
   useChangeMilestoneStatus,
   useReleaseFunds,
   useSendTransaction,
+  useUpdateEscrow,
+  useGetEscrowFromIndexerByContractIds,
 } from "@trustless-work/escrow/hooks";
 import type {
   InitializeMultiReleaseEscrowPayload,
@@ -26,6 +28,8 @@ export const useEscrowService = () => {
   const { approveMilestone } = useApproveMilestone();
   const { releaseFunds } = useReleaseFunds();
   const { sendTransaction } = useSendTransaction();
+  const { updateEscrow } = useUpdateEscrow();
+  const { getEscrowByContractIds } = useGetEscrowFromIndexerByContractIds();
 
   const handleDeploy = async (payload: InitializeMultiReleaseEscrowPayload): Promise<InitializeMultiReleaseEscrowResponse> => {
     const unsigned = await deployEscrow(payload, "multi-release");
@@ -61,11 +65,39 @@ export const useEscrowService = () => {
     return sendTransaction(signedXdr);
   };
 
+  const handleUpdateMilestoneReceiver = async (
+    contractId: string,
+    milestoneIndex: number,
+    agentAddress: string,
+    signer: string
+  ) => {
+    const result = await getEscrowByContractIds({
+      contractIds: [contractId],
+      validateOnChain: true,
+    });
+    const escrowData = Array.isArray(result) ? result[0] : result;
+    if (!escrowData) throw new Error("Escrow not found on-chain");
+
+    const milestones = [...(escrowData.milestones as Record<string, unknown>[])];
+    if (!milestones[milestoneIndex]) throw new Error("Milestone not found");
+    milestones[milestoneIndex] = { ...milestones[milestoneIndex], receiver: agentAddress };
+
+    const unsigned = await updateEscrow({
+      contractId,
+      escrow: { ...escrowData, milestones },
+      signer,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any, "multi-release");
+    const signedXdr = await signTransaction(unsigned.unsignedTransaction!, signer);
+    return sendTransaction(signedXdr);
+  };
+
   return {
     handleDeploy,
     handleFund,
     handleChangeMilestoneStatus,
     handleApproveMilestone,
     handleReleaseFunds,
+    handleUpdateMilestoneReceiver,
   };
 };
