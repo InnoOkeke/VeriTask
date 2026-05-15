@@ -14,6 +14,7 @@ import {
   requestAccess,
   getAddress as freighterGetAddress,
   signTransaction as freighterSign,
+  getNetwork as freighterGetNetwork,
 } from "@stellar/freighter-api";
 
 const FREIGHTER_ID = "freighter";
@@ -48,6 +49,14 @@ const freighterModule: ModuleInterface = {
   },
   signAuthEntry: async () => ({ signedAuthEntry: "", signerAddress: "" }),
   signMessage: async () => ({ signedMessage: "", signerAddress: "" }),
+  getNetwork: async () => {
+    try {
+      return await freighterGetNetwork();
+    } catch {
+      return { network: "testnet", networkPassphrase: "Test SDF Network ; September 2015" };
+    }
+  },
+  disconnect: async () => {},
 };
 
 const albedoPopup = (url: string): Promise<MessageEvent> =>
@@ -91,6 +100,8 @@ const albedoModule: ModuleInterface = {
   },
   signAuthEntry: async () => ({ signedAuthEntry: "", signerAddress: "" }),
   signMessage: async () => ({ signedMessage: "", signerAddress: "" }),
+  getNetwork: async () => ({ network: "testnet", networkPassphrase: "Test SDF Network ; September 2015" }),
+  disconnect: async () => {},
 };
 
 type WalletContextType = {
