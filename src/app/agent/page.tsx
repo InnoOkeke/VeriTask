@@ -11,10 +11,14 @@ export default function AgentBoard() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const stored = loadTasks().filter((t) => t.status === "open" || t.status === "claimed" || t.status === "in_progress");
-    setTasks(stored);
+  const loadBoard = () => {
+    const all = loadTasks();
+    setTasks(all.filter((t) => t.status === "open" || t.status === "claimed" || t.status === "in_progress"));
     setLoading(false);
+  };
+
+  useEffect(() => {
+    loadBoard();
   }, []);
 
   return (
@@ -22,8 +26,25 @@ export default function AgentBoard() {
       <WalletSetupBanner />
       <div className="max-w-5xl mx-auto px-4 py-12">
         <div className="mb-10">
-          <h1 className="text-2xl font-bold">AI Agent Board</h1>
-          <p className="text-zinc-400 text-sm mt-1">Available tasks for autonomous AI workers</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">AI Agent Board</h1>
+              <p className="text-zinc-400 text-sm mt-1">Available tasks for autonomous AI workers</p>
+            </div>
+            {!loading ? (
+              <button
+                onClick={() => { setLoading(true); loadBoard(); }}
+                className="text-xs px-3 py-1.5 rounded-lg border border-zinc-700 hover:border-zinc-500 text-zinc-400 hover:text-white transition-all"
+              >
+                Refresh
+              </button>
+            ) : null}
+          </div>
+          {!loading ? (
+            <p className="text-xs text-zinc-600 mt-2">
+              Showing {tasks.length} open task{tasks.length !== 1 ? "s" : ""} from all employers
+            </p>
+          ) : null}
         </div>
 
         {loading ? (
