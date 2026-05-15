@@ -8,113 +8,60 @@ import {
   useChangeMilestoneStatus,
   useReleaseFunds,
   useSendTransaction,
-  useGetEscrowsFromIndexerBySigner,
 } from "@trustless-work/escrow/hooks";
 import type {
-  EscrowType,
   InitializeMultiReleaseEscrowPayload,
-  InitializeMultiReleaseEscrowResponse,
   FundEscrowPayload,
   ApproveMilestonePayload,
   ChangeMilestoneStatusPayload,
   MultiReleaseReleaseFundsPayload,
-  GetEscrowsFromIndexerBySignerParams,
 } from "@trustless-work/escrow";
 
-function extractError(err: unknown): string {
-  const e = err as { response?: { data?: unknown; status?: number }; message?: string };
-  if (e.response?.data) {
-    return `API ${e.response.status || "error"}: ${JSON.stringify(e.response.data)}`;
-  }
-  return e.message || String(err);
-}
-
-export function useEscrowService() {
-  const { signXdr } = useWallet();
+export const useEscrowService = () => {
+  const { walletAddress, signTransaction } = useWallet();
   const { deployEscrow } = useInitializeEscrow();
   const { fundEscrow } = useFundEscrow();
-  const { approveMilestone } = useApproveMilestone();
   const { changeMilestoneStatus } = useChangeMilestoneStatus();
+  const { approveMilestone } = useApproveMilestone();
   const { releaseFunds } = useReleaseFunds();
   const { sendTransaction } = useSendTransaction();
-  const { getEscrowsBySigner } = useGetEscrowsFromIndexerBySigner();
 
-  const signAndSend = async (unsignedXdr: string) => {
-    const signed = await signXdr(unsignedXdr);
-    return sendTransaction(signed);
+  const handleDeploy = async (payload: InitializeMultiReleaseEscrowPayload) => {
+    const unsigned = await deployEscrow(payload, "multi-release");
+    const signedXdr = await signTransaction(unsigned.unsignedTransaction!, payload.signer);
+    const result = await sendTransaction(signedXdr);
+    return result;
+  };
+
+  const handleFund = async (payload: FundEscrowPayload) => {
+    const unsigned = await fundEscrow(payload, "multi-release");
+    const signedXdr = await signTransaction(unsigned.unsignedTransaction!, payload.signer);
+    return sendTransaction(signedXdr);
+  };
+
+  const handleChangeMilestoneStatus = async (payload: ChangeMilestoneStatusPayload) => {
+    const unsigned = await changeMilestoneStatus(payload, "multi-release");
+    const signedXdr = await signTransaction(unsigned.unsignedTransaction!, payload.serviceProvider);
+    return sendTransaction(signedXdr);
+  };
+
+  const handleApproveMilestone = async (payload: ApproveMilestonePayload) => {
+    const unsigned = await approveMilestone(payload, "multi-release");
+    const signedXdr = await signTransaction(unsigned.unsignedTransaction!, payload.approver);
+    return sendTransaction(signedXdr);
+  };
+
+  const handleReleaseFunds = async (payload: MultiReleaseReleaseFundsPayload) => {
+    const unsigned = await releaseFunds(payload, "multi-release");
+    const signedXdr = await signTransaction(unsigned.unsignedTransaction!, payload.releaseSigner);
+    return sendTransaction(signedXdr);
   };
 
   return {
-    deploy: async (payload: InitializeMultiReleaseEscrowPayload) => {
-      try {
-        const res = await deployEscrow(payload, "multi-release" as EscrowType);
-        if (res.status !== "SUCCESS" || !res.unsignedTransaction) {
-          throw new Error(`Deploy failed: ${JSON.stringify(res)}`);
-        }
-        const txRes = await signAndSend(res.unsignedTransaction);
-        if (txRes.status !== "SUCCESS") {
-          throw new Error(`Deploy tx failed: ${JSON.stringify(txRes)}`);
-        }
-        const initRes = txRes as InitializeMultiReleaseEscrowResponse;
-        if (!initRes.contractId) {
-          throw new Error(`No contractId in response: ${JSON.stringify(txRes)}`);
-        }
-        return initRes;
-      } catch (err) {
-        throw new Error(`Deploy error: ${extractError(err)}`);
-      }
-    },
-
-    fund: async (payload: FundEscrowPayload) => {
-      try {
-        const res = await fundEscrow(payload, "multi-release" as EscrowType);
-        if (res.status !== "SUCCESS" || !res.unsignedTransaction) {
-          throw new Error(`Fund failed: ${JSON.stringify(res)}`);
-        }
-        return signAndSend(res.unsignedTransaction);
-      } catch (err) {
-        throw new Error(`Fund error: ${extractError(err)}`);
-      }
-    },
-
-    approve: async (payload: ApproveMilestonePayload) => {
-      try {
-        const res = await approveMilestone(payload, "multi-release" as EscrowType);
-        if (res.status !== "SUCCESS" || !res.unsignedTransaction) {
-          throw new Error(`Approve failed: ${JSON.stringify(res)}`);
-        }
-        return signAndSend(res.unsignedTransaction);
-      } catch (err) {
-        throw new Error(`Approve error: ${extractError(err)}`);
-      }
-    },
-
-    changeStatus: async (payload: ChangeMilestoneStatusPayload) => {
-      try {
-        const res = await changeMilestoneStatus(payload, "multi-release" as EscrowType);
-        if (res.status !== "SUCCESS" || !res.unsignedTransaction) {
-          throw new Error(`Status change failed: ${JSON.stringify(res)}`);
-        }
-        return signAndSend(res.unsignedTransaction);
-      } catch (err) {
-        throw new Error(`Status error: ${extractError(err)}`);
-      }
-    },
-
-    release: async (payload: MultiReleaseReleaseFundsPayload) => {
-      try {
-        const res = await releaseFunds(payload, "multi-release" as EscrowType);
-        if (res.status !== "SUCCESS" || !res.unsignedTransaction) {
-          throw new Error(`Release failed: ${JSON.stringify(res)}`);
-        }
-        return signAndSend(res.unsignedTransaction);
-      } catch (err) {
-        throw new Error(`Release error: ${extractError(err)}`);
-      }
-    },
-
-    getEscrows: async (params: GetEscrowsFromIndexerBySignerParams) => {
-      return getEscrowsBySigner(params);
-    },
+    handleDeploy,
+    handleFund,
+    handleChangeMilestoneStatus,
+    handleApproveMilestone,
+    handleReleaseFunds,
   };
-}
+};

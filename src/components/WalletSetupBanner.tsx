@@ -7,11 +7,9 @@ import { Account, Asset, Operation, TransactionBuilder, Networks } from "@stella
 const USDC_ISSUER = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
 const HORIZON = "https://horizon-testnet.stellar.org";
 
-function getSetupKey(address: string): string {
-  return `veritask_setup_${address}`;
-}
+const getSetupKey = (address: string) => `veritask_setup_${address}`;
 
-async function hasTrustline(address: string): Promise<boolean> {
+const hasTrustline = async (address: string): Promise<boolean> => {
   try {
     const resp = await fetch(`${HORIZON}/accounts/${address}`);
     if (!resp.ok) return false;
@@ -23,51 +21,48 @@ async function hasTrustline(address: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
+};
 
-export function WalletSetupBanner() {
-  const { connected, publicKey, signXdr } = useWallet();
+export const WalletSetupBanner = () => {
+  const { walletAddress, signTransaction } = useWallet();
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
   const [needsSetup, setNeedsSetup] = useState(true);
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
   const [dismissed, setDismissed] = useState(false);
 
-  // Check if trustline exists on mount / wallet change
   useEffect(() => {
-    if (!connected || !publicKey) {
+    if (!walletAddress) {
       setChecking(false);
       return;
     }
 
-    // Check localStorage first
-    const key = getSetupKey(publicKey);
+    const key = getSetupKey(walletAddress);
     if (localStorage.getItem(key) === "done") {
       setNeedsSetup(false);
       setChecking(false);
       return;
     }
 
-    // Verify on-chain
     setChecking(true);
-    hasTrustline(publicKey).then((has) => {
+    hasTrustline(walletAddress).then((has) => {
       if (has) {
         localStorage.setItem(key, "done");
       }
       setNeedsSetup(!has);
       setChecking(false);
     });
-  }, [connected, publicKey]);
+  }, [walletAddress]);
 
-  if (!connected || !publicKey || checking || dismissed || !needsSetup) return null;
+  if (!walletAddress || checking || dismissed || !needsSetup) return null;
 
-  const addTrustline = async () => {
-    if (!publicKey) return;
+  const handleAddTrustline = async () => {
+    if (!walletAddress) return;
     setLoading(true);
     setResult(null);
 
     try {
-      const resp = await fetch(`${HORIZON}/accounts/${publicKey}`);
+      const resp = await fetch(`${HORIZON}/accounts/${walletAddress}`);
       if (!resp.ok) {
         throw new Error(
           "Account not funded. Get testnet XLM first: https://laboratory.stellar.org/#account-creator?network=test"
@@ -80,15 +75,11 @@ export function WalletSetupBanner() {
         fee: "10000",
         networkPassphrase: Networks.TESTNET,
       })
-        .addOperation(
-          Operation.changeTrust({
-            asset: new Asset("USDC", USDC_ISSUER),
-          })
-        )
+        .addOperation(Operation.changeTrust({ asset: new Asset("USDC", USDC_ISSUER) }))
         .setTimeout(30)
         .build();
 
-      const signedXdr = await signXdr(tx.toXDR(), Networks.TESTNET);
+      const signedXdr = await signTransaction(tx.toXDR(), walletAddress);
 
       const submitResp = await fetch(`${HORIZON}/transactions`, {
         method: "POST",
@@ -99,7 +90,7 @@ export function WalletSetupBanner() {
       const submitJson = await submitResp.json();
 
       if (submitJson.successful || submitJson.hash) {
-        localStorage.setItem(getSetupKey(publicKey), "done");
+        localStorage.setItem(getSetupKey(walletAddress), "done");
         setResult({ ok: true, msg: "USDC trustline added!" });
         setTimeout(() => setNeedsSetup(false), 1500);
       } else {
@@ -120,7 +111,6 @@ export function WalletSetupBanner() {
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
             <h3 className="text-sm font-semibold text-amber-300 mb-3">Testnet Wallet Setup</h3>
-
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-4">
                 <div>
@@ -137,40 +127,36 @@ export function WalletSetupBanner() {
                   </p>
                 </div>
               </div>
-
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-xs text-zinc-300 font-medium">2. Add USDC Trustline</p>
                   <p className="text-[11px] text-zinc-500">Allows your wallet to hold USDC</p>
                 </div>
                 <button
-                  onClick={addTrustline}
+                  onClick={handleAddTrustline}
                   disabled={loading}
                   className="text-[11px] px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-medium transition-colors disabled:opacity-50 whitespace-nowrap"
                 >
                   {loading ? "Signing..." : "Add Trustline"}
                 </button>
               </div>
-
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-xs text-zinc-300 font-medium">3. Get Soroban USDC</p>
+                  <p className="text-xs text-zinc-300 font-medium">3. Get testnet USDC</p>
                   <p className="text-[11px] text-zinc-500">
-                    You need Soroban-based USDC, not classic Stellar USDC.{" "}
                     <a
                       href="https://docs.trustlesswork.com/trustless-work/introduction/stellar-and-soroban-the-backbone-of-trustless-work/testnet-tokens"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-amber-400 hover:underline"
                     >
-                      Get testnet tokens →
+                      Trustless Work Testnet Tokens →
                     </a>
                   </p>
                 </div>
               </div>
             </div>
-
-            {result && (
+            {result ? (
               <div
                 className={`mt-3 p-2 rounded-lg text-xs ${
                   result.ok
@@ -180,10 +166,9 @@ export function WalletSetupBanner() {
               >
                 {result.msg}
               </div>
-            )}
-
+            ) : null}
             <div className="mt-3 p-2 rounded-lg bg-zinc-900/50 border border-zinc-800">
-              <p className="text-[10px] font-mono text-zinc-500 break-all">{publicKey}</p>
+              <p className="text-[10px] font-mono text-zinc-500 break-all">{walletAddress}</p>
             </div>
           </div>
           <button
@@ -197,4 +182,4 @@ export function WalletSetupBanner() {
       </div>
     </div>
   );
-}
+};

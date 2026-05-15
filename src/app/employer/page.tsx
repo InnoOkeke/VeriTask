@@ -6,36 +6,31 @@ import { useWallet } from "@/components/WalletProvider";
 import { RequireWallet } from "@/components/RequireWallet";
 import { WalletSetupBanner } from "@/components/WalletSetupBanner";
 import { loadTasks } from "@/lib/store";
-import { useEscrowService } from "@/lib/escrowService";
 import type { Task } from "@/lib/types";
 
+const statusColor = (s: string) => {
+  const map: Record<string, string> = {
+    open: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+    claimed: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+    in_progress: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+    completed: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    disputed: "bg-red-500/10 text-red-400 border-red-500/20",
+    paid: "bg-violet-500/10 text-violet-400 border-violet-500/20",
+  };
+  return map[s] || "bg-zinc-500/10 text-zinc-400 border-zinc-500/20";
+};
+
 export default function EmployerDashboard() {
-  const { publicKey } = useWallet();
-  const escrow = useEscrowService();
+  const { walletAddress } = useWallet();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!publicKey) return;
-    const stored = loadTasks().filter(
-      (t) => t.employerAddress === publicKey
-    );
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!walletAddress) return;
+    const stored = loadTasks().filter((t) => t.employerAddress === walletAddress);
     setTasks(stored);
     setLoading(false);
-  }, [publicKey]);
-
-  const statusColor = (s: string) => {
-    const map: Record<string, string> = {
-      open: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-      claimed: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-      in_progress: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
-      completed: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-      disputed: "bg-red-500/10 text-red-400 border-red-500/20",
-      paid: "bg-violet-500/10 text-violet-400 border-violet-500/20",
-    };
-    return map[s] || "bg-zinc-500/10 text-zinc-400 border-zinc-500/20";
-  };
+  }, [walletAddress]);
 
   return (
     <RequireWallet>
@@ -87,11 +82,11 @@ export default function EmployerDashboard() {
                       <span className="text-xs text-zinc-500">
                         {task.totalAmount} {task.asset}
                       </span>
-                      {task.escrowContractId && (
+                      {task.escrowContractId ? (
                         <span className="text-xs text-violet-400 font-mono">
                           {task.escrowContractId.slice(0, 10)}...
                         </span>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                   <span

@@ -2,22 +2,17 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useWallet } from "@/components/WalletProvider";
 import { RequireWallet } from "@/components/RequireWallet";
 import { WalletSetupBanner } from "@/components/WalletSetupBanner";
 import { loadTasks } from "@/lib/store";
 import type { Task } from "@/lib/types";
 
 export default function AgentBoard() {
-  const { publicKey } = useWallet();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const stored = loadTasks().filter(
-      (t) => t.status === "open" || t.status === "claimed"
-    );
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    const stored = loadTasks().filter((t) => t.status === "open" || t.status === "claimed");
     setTasks(stored);
     setLoading(false);
   }, []);
@@ -51,17 +46,15 @@ export default function AgentBoard() {
                     <h3 className="font-semibold">{task.title}</h3>
                     <p className="text-sm text-zinc-500 mt-1 line-clamp-2">{task.description}</p>
                     <div className="flex items-center gap-4 mt-3">
-                      <span className="text-xs text-zinc-500">
-                        {task.milestones.length} milestones
-                      </span>
+                      <span className="text-xs text-zinc-500">{task.milestones.length} milestones</span>
                       <span className="text-sm font-semibold text-cyan-400">
                         {task.totalAmount} {task.asset}
                       </span>
-                      {task.escrowContractId && (
+                      {task.escrowContractId ? (
                         <span className="text-xs text-violet-400 font-mono">
                           {task.escrowContractId.slice(0, 10)}...
                         </span>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-2">

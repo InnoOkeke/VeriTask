@@ -1,13 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useWallet } from "@/components/WalletProvider";
 import { useEscrowService } from "@/lib/escrowService";
 import { addTask } from "@/lib/store";
-import type { Task, Milestone } from "@/lib/types";
+import type { Task } from "@/lib/types";
 import { RequireWallet } from "@/components/RequireWallet";
 import { WalletSetupBanner } from "@/components/WalletSetupBanner";
+
+const TRUSTLINE_ADDRESS = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
+const PLATFORM_FEE = 4;
 
 interface NewMilestone {
   id: string;
@@ -23,7 +26,7 @@ interface Draft {
 
 const DRAFT_KEY = "veritask_create_draft";
 
-function loadDraft(): Draft | null {
+const loadDraft = (): Draft | null => {
   if (typeof window === "undefined") return null;
   try {
     const raw = localStorage.getItem(DRAFT_KEY);
@@ -31,22 +34,22 @@ function loadDraft(): Draft | null {
   } catch {
     return null;
   }
-}
+};
 
-function saveDraft(draft: Draft) {
+const saveDraft = (draft: Draft) => {
   if (typeof window === "undefined") return;
   localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-}
+};
 
-function clearDraft() {
+const clearDraft = () => {
   if (typeof window === "undefined") return;
   localStorage.removeItem(DRAFT_KEY);
-}
+};
 
 export default function CreateTask() {
   const router = useRouter();
-  const { publicKey } = useWallet();
-  const escrow = useEscrowService();
+  const { walletAddress } = useWallet();
+  const { handleDeploy, handleFund } = useEscrowService();
 
   const draft = loadDraft();
   const [title, setTitle] = useState(draft?.title || "");
@@ -57,12 +60,8 @@ export default function CreateTask() {
   const [deploying, setDeploying] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
-  const PLATFORM_FEE = 2;
 
-  // Auto-save to localStorage on every change
-  useEffect(() => {
-    saveDraft({ title, description, milestones });
-  }, [title, description, milestones]);
+  saveDraft({ title, description, milestones });
 
   const addMilestone = () => {
     setMilestones((prev) => [
@@ -86,7 +85,7 @@ export default function CreateTask() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!publicKey) return;
+    if (!walletAddress) return;
     if (!title || !description || milestones.some((m) => !m.description || !m.amount)) return;
 
     setDeploying(true);
@@ -96,42 +95,41 @@ export default function CreateTask() {
     const engagementId = `eng-${Date.now()}`;
 
     try {
-      const result = await escrow.deploy({
-        signer: publicKey,
+      const result = await handleDeploy({
+        signer: walletAddress,
         engagementId,
         title,
         description,
         platformFee: PLATFORM_FEE,
         roles: {
-          approver: publicKey,
-          serviceProvider: publicKey,
-          platformAddress: publicKey,
-          releaseSigner: publicKey,
-          disputeResolver: publicKey,
+          approver: walletAddress,
+          serviceProvider: walletAddress,
+          platformAddress: walletAddress,
+          releaseSigner: walletAddress,
+          disputeResolver: walletAddress,
         },
         milestones: milestones.map((m) => ({
           description: m.description,
           amount: m.amount,
-          receiver: publicKey,
+          receiver: walletAddress,
         })),
         trustline: {
           symbol: "USDC",
-          address: publicKey,
+          address: TRUSTLINE_ADDRESS,
         },
       });
 
       const contractId = result.contractId;
 
-      // Soroban contracts use C... addresses — wait for tx finality
       setStatus("Escrow deployed. Waiting for network confirmation...");
       await new Promise((r) => setTimeout(r, 8000));
 
       setStatus("Funding escrow...");
 
-      await escrow.fund({
+      await handleFund({
         contractId,
-        signer: publicKey,
-        amount: totalAmount + PLATFORM_FEE,
+        signer: walletAddress,
+        amount: totalAmount,
       });
 
       const task: Task = {
@@ -147,7 +145,7 @@ export default function CreateTask() {
           amount: m.amount,
           status: "pending" as const,
         })),
-        employerAddress: publicKey,
+        employerAddress: walletAddress,
         escrowContractId: contractId,
         engagementId,
         createdAt: new Date(),
@@ -158,7 +156,7 @@ export default function CreateTask() {
       setStatus("Task created and escrow funded!");
       setTimeout(() => router.push("/employer"), 1500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to deploy escrow");
+      setError(err instanceof Error ? err.message : "Deploy failed");
     } finally {
       setDeploying(false);
     }
@@ -179,7 +177,7 @@ export default function CreateTask() {
         <p className="text-zinc-400 text-sm mb-1">
           Define milestones. An escrow is deployed on Stellar — funds release only when each milestone is verified.
         </p>
-        {(draft && (draft.title || draft.description)) && (
+        {(draft && (draft.title || draft.description)) ? (
           <p className="text-xs text-zinc-600 mb-6">
             Form auto-saved.{" "}
             <button
@@ -190,21 +188,20 @@ export default function CreateTask() {
               Clear draft
             </button>
           </p>
-        )}
-        {(!draft || (!draft.title && !draft.description)) && (
+        ) : (
           <p className="text-xs text-zinc-600 mb-6">Form auto-saves to this device.</p>
         )}
 
-        {status && (
+        {status ? (
           <div className="mb-6 p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 text-sm text-emerald-400">
             {status}
           </div>
-        )}
-        {error && (
+        ) : null}
+        {error ? (
           <div className="mb-6 p-4 rounded-xl border border-red-500/20 bg-red-500/5 text-sm text-red-400">
             {error}
           </div>
-        )}
+        ) : null}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
@@ -248,13 +245,10 @@ export default function CreateTask() {
 
             <div className="space-y-3">
               {milestones.map((m, i) => (
-                <div
-                  key={m.id}
-                  className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/50 space-y-3"
-                >
+                <div key={m.id} className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/50 space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-zinc-500 font-mono">Milestone {i + 1}</span>
-                    {milestones.length > 1 && (
+                    {milestones.length > 1 ? (
                       <button
                         type="button"
                         onClick={() => removeMilestone(m.id)}
@@ -263,7 +257,7 @@ export default function CreateTask() {
                       >
                         Remove
                       </button>
-                    )}
+                    ) : null}
                   </div>
                   <input
                     type="text"
@@ -279,9 +273,7 @@ export default function CreateTask() {
                     <input
                       type="number"
                       value={m.amount || ""}
-                      onChange={(e) =>
-                        updateMilestone(m.id, "amount", parseFloat(e.target.value) || 0)
-                      }
+                      onChange={(e) => updateMilestone(m.id, "amount", parseFloat(e.target.value) || 0)}
                       placeholder="Amount"
                       min={1}
                       step={0.01}
@@ -298,20 +290,9 @@ export default function CreateTask() {
           <div className="flex items-center justify-between p-4 rounded-xl border border-violet-500/20 bg-violet-500/5">
             <span className="text-sm text-zinc-300">Total Escrow Amount</span>
             <span className="text-lg font-bold text-violet-400">
-              {totalAmount + PLATFORM_FEE} USDC
+              {totalAmount} USDC
             </span>
           </div>
-          <p className="text-[11px] text-zinc-600 -mt-4">
-            Includes {PLATFORM_FEE} USDC platform fee. Requires Soroban USDC.{" "}
-            <a
-              href="https://docs.trustlesswork.com/trustless-work/introduction/stellar-and-soroban-the-backbone-of-trustless-work/testnet-tokens"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-amber-400 hover:underline"
-            >
-              Get testnet tokens →
-            </a>
-          </p>
 
           <button
             type="submit"
