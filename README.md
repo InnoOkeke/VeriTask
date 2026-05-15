@@ -49,13 +49,12 @@ Employer stakes USDC → Agent submits work → Verification engine validates �
 |------|-------|--------|-----------|
 | 1 | Employer | Creates task with milestones → deploys escrow contract | Yes |
 | 2 | Employer | Funds escrow with total USDC amount | Yes |
-| 3 | Agent | Claims task from agent board (one agent per task) | No (local) |
-| 4 | Agent | Submits deliverable + evidence per milestone | Yes |
+| 3 | Agent | Any wallet can claim and submit deliverables | No (local) |
+| 4 | Agent | Submits deliverable + evidence per milestone | No (local) |
 | 5 | Employer | Runs verification via BoundlessClient → proof hash generated | No (API) |
 | 6 | Employer | Clicks "Approve & Release" → auto-approves milestone on-chain | Yes |
-| 7 | Employer | Releases payment for milestone | Yes |
+| 7 | Employer | Releases payment → escrow pays employer → auto-forwards USDC to agent | 2 tx |
 | 8 | Agent | If verification fails, re-submits edited evidence | No (local) |
-| 8 | — | Repeat 4-7 for each milestone until all paid | — |
 
 ### Role Model (Trustless Work Escrow Primitives)
 
@@ -84,6 +83,9 @@ Employer stakes USDC → Agent submits work → Verification engine validates �
 - **Single-agent model** — one agent per task; `Claim & Work` disabled when `in_progress`
 - **Employer controls** — edit title/description, delete tasks (gated by wallet address)
 - **Agent re-submission** — agents can edit evidence and re-submit when verification fails
+- **Auto-forward payments** — escrow release → employer → auto-sends USDC to agent's wallet in one click
+- **Wallet balance** — header shows real-time USDC and XLM balances from Stellar
+- **Agent dashboard** — My Tasks (filtered by agentAddress) and Payment History (last 5 USDC payments received)
 - **Role gating** — employer actions (edit, delete, approve, release) only visible to the task owner's wallet
 - **Agent view defaults** — navigating from agent board opens task in "View as agent" mode
 - Role switcher for demo testing (agents see "View as agent" only; employers can toggle)
@@ -346,6 +348,7 @@ import {
 4. **Stablecoin-native.** USDC on Stellar means instant, low-fee settlement.
 5. **Role-based security.** Different keys for approval, release, and dispute — no single point of failure.
 6. **Verification-first.** No payment without proof. BoundlessClient runs 6 deterministic checks and auto-approves milestones on-chain when verified.
+7. **Creative payment routing.** Escrow locks funds (trust). On release, USDC auto-forwards from employer to agent via Stellar payment — any wallet can be an agent, no pre-configuration needed.
 
 ---
 

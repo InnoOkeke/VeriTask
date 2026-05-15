@@ -652,8 +652,8 @@ This is necessary because localStorage is external to React's state system.
 ### Known Limitations (Development)
 
 - **API key exposure:** `NEXT_PUBLIC_TRUSTLESS_API_KEY` is bundled in client-side JavaScript. For production, route through a backend proxy.
-- **Single-device state:** localStorage means tasks created on one browser are invisible to others.
-- **Demo mode fallback:** If no tasks exist in localStorage, demo tasks from `lib/demo.ts` are loaded. These have no on-chain escrow and mock employer addresses.
+- **Multi-user state:** Supabase PostgreSQL with localStorage fallback. Tasks sync across devices when Supabase is configured.
+- **Demo mode fallback:** If no tasks exist, demo tasks from `lib/demo.ts` are loaded. These have no on-chain escrow and mock employer addresses.
 - **No dispute UI:** The `disputed` status and `disputeResolver` role exist in the type system and contract but have no frontend trigger.
 - **Role self-assignment:** In the current implementation, all roles (`approver`, `serviceProvider`, `releaseSigner`, `disputeResolver`) are set to the creator's wallet for demo purposes. In production, roles should be assigned to different addresses.
 
@@ -666,7 +666,7 @@ This is necessary because localStorage is external to React's state system.
 ```
 Step 1: CREATE TASK (/employer/new)
   ├── User fills form (title, description, milestones)
-  ├── Form auto-saves to localStorage draft
+  ├── Draft available as optional banner (not forced auto-save)
   ├── User clicks "Deploy Escrow & Fund"
   ├── handleDeploy() → deployEscrow() → signTransaction() → sendTransaction()
   │   └── On-chain: escrow contract deployed, contractId returned
@@ -674,21 +674,18 @@ Step 1: CREATE TASK (/employer/new)
   ├── handleFund() → fundEscrow() → signTransaction() → sendTransaction()
   │   └── On-chain: USDC transferred to escrow contract
   ├── Task object created with status: "open"
-  ├── addTask() → localStorage
+  ├── addTask() → Supabase (or localStorage fallback)
   └── Redirect to /employer dashboard
 
 Step 2: SUBMIT WORK (agent view on /task/[id])
-  ├── User switches to "View as agent"
+  ├── Any linked wallet can view as agent (no on-chain serviceProvider role required)
   ├── Clicks "Submit Deliverable" for milestone
-  ├── handleSubmitWork() checks: walletAddress, escrowContractId, not busy
-  ├── handleChangeMilestoneStatus()
-  │   ├── changeMilestoneStatus({ newStatus: "Submitted", serviceProvider })
-  │   ├── signTransaction(xdr, walletAddress)
-  │   └── sendTransaction(signedXdr)
-  │   └── On-chain: milestone status changed to "Submitted"
-  ├── updateMilestone() → localStorage
+  ├── Generates evidence string from milestone description (auto-passes verification)
+  ├── If wallet matches employer: calls changeMilestoneStatus on-chain (serviceProvider match)
+  ├── If wallet differs: local-only submission (no on-chain call needed)
+  ├── updateMilestone() → Supabase
   │   └── status: "submitted", evidence: generated evidence string
-  ├── updateTask() → localStorage
+  ├── updateTask() → Supabase
   │   └── status: "in_progress", agentAddress: walletAddress
   └── refresh() → UI re-renders
 
@@ -725,9 +722,18 @@ Step 5: RELEASE PAYMENT (employer view on /task/[id])
   ├── Approved milestone shows "Release Payment" button
   ├── handleRelease()
   │   ├── handleReleaseFunds({ contractId, milestoneIndex, releaseSigner })
-  │   ├── signTransaction(xdr, walletAddress)
+  │   ├── signTransaction(xdr, walletAddress) ← Sign #1
   │   └── sendTransaction(signedXdr)
-  │   └── On-chain: USDC released from escrow to service provider
+  │   └── On-chain: USDC released from escrow to employer (receiver)
+  ├── 5s delay (funds settlement)
+  │   └── If agentAddress differs from employer:
+  │       ├── handleForwardPayment(employer, agent, amount)
+  │       │   ├── Fetches account sequence from Horizon
+  │       │   ├── Checks USDC balance
+  │       │   ├── Builds Stellar payment operation
+  │       │   ├── signTransaction(xdr, walletAddress) ← Sign #2
+  │       │   └── Submits to Horizon (not Trustless Work helper)
+  │       └── On-chain: USDC payment from employer → agent
   ├── updateMilestone({ status: "released" })
   ├── If all milestones released:
   │   ├── updateTask({ status: "paid" })
@@ -806,6 +812,9 @@ Environment variables required on Vercel:
 - [x] Testnet onboarding wizard (XLM funding, USDC trustline)
 - [x] BoundlessClient integration — verify→proof→auto-approve pipeline
 - [x] Supabase PostgreSQL — multi-user database with localStorage fallback
+- [x] Creative payment routing — escrow release → auto-forward USDC to agent via Stellar payment
+- [x] Agent dashboard — My Tasks (filtered by agentAddress), Payment History, wallet balances
+- [x] Any-wallet agent model — any connected wallet can submit work, no pre-configuration
 
 ### Phase 2: Boundless ZK Proofs (Next)
 
