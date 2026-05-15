@@ -131,6 +131,18 @@ export async function updateTask(id: string, updates: Partial<Task>): Promise<vo
   }
 }
 
+export async function deleteTask(id: string): Promise<void> {
+  if (hasSupabase() && sb()) {
+    const { error } = await sb()!.from("tasks").delete().eq("id", id);
+    if (error) {
+      console.error("Supabase deleteTask error:", error);
+    }
+    return;
+  }
+  const tasks = loadTasksLocal();
+  saveTasksLocal(tasks.filter((t) => t.id !== id));
+}
+
 export async function updateMilestone(
   taskId: string,
   milestoneId: string,

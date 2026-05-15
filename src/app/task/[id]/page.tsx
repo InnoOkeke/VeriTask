@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useWallet } from "@/components/WalletProvider";
 import { RequireWallet } from "@/components/RequireWallet";
-import { getTask, updateMilestone, updateTask } from "@/lib/store";
+import { getTask, updateMilestone, updateTask, deleteTask } from "@/lib/store";
 import { useEscrowService } from "@/lib/escrowService";
 import { VerificationPanel } from "@/components/VerificationPanel";
 import { DEMO_TASKS } from "@/lib/demo";
@@ -47,6 +47,31 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
 
   const refresh = () => { loadTask(); };
   const addLog = useCallback((msg: string) => setLog((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]), []);
+
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDesc, setEditDesc] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
+  const startEdit = () => {
+    if (!task) return;
+    setEditTitle(task.title);
+    setEditDesc(task.description);
+    setEditing(true);
+  };
+
+  const saveEdit = async () => {
+    if (!task || !editTitle.trim()) return;
+    await updateTask(task.id, { title: editTitle.trim(), description: editDesc.trim() });
+    setEditing(false);
+    refresh();
+  };
+
+  const handleDelete = async () => {
+    if (!task) return;
+    await deleteTask(task.id);
+    router.push("/employer");
+  };
 
   if (taskLoading) {
     return (
@@ -168,42 +193,114 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
         </div>
 
         <div className="p-6 rounded-2xl border border-zinc-800 bg-zinc-900/50 mb-8">
-          <div className="flex items-start justify-between gap-4 mb-4">
-            <div>
-              <h1 className="text-xl font-bold mb-2">{task.title}</h1>
-              <p className="text-sm text-zinc-400">{task.description}</p>
-            </div>
-            <span
-              className={`text-xs px-2.5 py-1 rounded-full border capitalize whitespace-nowrap ${
-                task.status === "paid"
-                  ? "bg-violet-500/10 text-violet-400 border-violet-500/20"
-                  : task.status === "disputed"
-                    ? "bg-red-500/10 text-red-400 border-red-500/20"
-                    : "bg-blue-500/10 text-blue-400 border-blue-500/20"
-              }`}
-            >
-              {task.status.replace("_", " ")}
-            </span>
-          </div>
-          <div className="flex items-center gap-6 text-sm mb-4">
-            <span className="text-zinc-500">{task.totalAmount} {task.asset}</span>
-            <span className="text-zinc-500">{task.milestones.length} milestones</span>
-            {task.escrowContractId ? (
-              <span className="text-xs text-violet-400 font-mono">Escrow: {task.escrowContractId.slice(0, 14)}...</span>
-            ) : null}
-          </div>
-          <div>
-            <div className="flex items-center justify-between text-xs text-zinc-500 mb-2">
-              <span>Milestone Progress</span>
-              <span>{completedCount}/{task.milestones.length} ({progressPct}%)</span>
-            </div>
-            <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-violet-500 to-cyan-500 transition-all duration-500"
-                style={{ width: `${progressPct}%` }}
+          {editing ? (
+            <div className="space-y-4">
+              <input
+                type="text"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-lg font-bold focus:outline-none focus:border-violet-500"
+                placeholder="Task title"
               />
+              <textarea
+                value={editDesc}
+                onChange={(e) => setEditDesc(e.target.value)}
+                rows={3}
+                className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm focus:outline-none focus:border-violet-500 resize-none"
+                placeholder="Task description"
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={saveEdit}
+                  className="text-xs px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-medium transition-colors"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => setEditing(false)}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-zinc-700 hover:border-zinc-500 text-zinc-400 hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <>
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <div>
+                  <h1 className="text-xl font-bold mb-2">{task.title}</h1>
+                  <p className="text-sm text-zinc-400">{task.description}</p>
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  <span
+                    className={`text-xs px-2.5 py-1 rounded-full border capitalize whitespace-nowrap ${
+                      task.status === "paid"
+                        ? "bg-violet-500/10 text-violet-400 border-violet-500/20"
+                        : task.status === "disputed"
+                          ? "bg-red-500/10 text-red-400 border-red-500/20"
+                          : "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                    }`}
+                  >
+                    {task.status.replace("_", " ")}
+                  </span>
+                  {role === "employer" ? (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={startEdit}
+                        disabled={busy}
+                        className="text-xs px-2 py-1 rounded text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors disabled:opacity-50"
+                      >
+                        Edit
+                      </button>
+                      {!deleting ? (
+                        <button
+                          onClick={() => setDeleting(true)}
+                          disabled={busy}
+                          className="text-xs px-2 py-1 rounded text-zinc-500 hover:text-red-400 hover:bg-zinc-800 transition-colors disabled:opacity-50"
+                        >
+                          Delete
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={handleDelete}
+                            className="text-xs px-2 py-1 rounded bg-red-600 hover:bg-red-500 text-white transition-colors"
+                          >
+                            Confirm
+                          </button>
+                          <button
+                            onClick={() => setDeleting(false)}
+                            className="text-xs px-2 py-1 rounded text-zinc-500 hover:text-white transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+              <div className="flex items-center gap-6 text-sm mb-4">
+                <span className="text-zinc-500">{task.totalAmount} {task.asset}</span>
+                <span className="text-zinc-500">{task.milestones.length} milestones</span>
+                {task.escrowContractId ? (
+                  <span className="text-xs text-violet-400 font-mono">Escrow: {task.escrowContractId.slice(0, 14)}...</span>
+                ) : null}
+              </div>
+              <div>
+                <div className="flex items-center justify-between text-xs text-zinc-500 mb-2">
+                  <span>Milestone Progress</span>
+                  <span>{completedCount}/{task.milestones.length} ({progressPct}%)</span>
+                </div>
+                <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-violet-500 to-cyan-500 transition-all duration-500"
+                    style={{ width: `${progressPct}%` }}
+                  />
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {task.escrowContractId ? (
