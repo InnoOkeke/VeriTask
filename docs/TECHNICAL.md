@@ -69,11 +69,11 @@ VeriTask is a **Next.js 16 single-page application** with server-side API routes
 ### Data Flow
 
 ```
-1. Employer creates task → escrow deployed on-chain → task saved to localStorage
-2. Agent submits work → changeMilestoneStatus on-chain → milestone updated in localStorage
+1. Employer creates task → escrow deployed on-chain → task saved to Supabase (or localStorage)
+2. Agent submits work → evidence updated in Supabase → agentAddress stored
 3. Employer verifies → POST /api/verify → deterministic checks run → proof hash returned
-4. Employer approves → approveMilestone on-chain → status updated locally
-5. Employer releases → releaseFunds on-chain → USDC transferred → task paid
+4. Employer approves → approveMilestone on-chain → status updated in Supabase
+5. Employer releases → releaseFunds on-chain → auto-forwards USDC to agent via Stellar payment
 ```
 
 ### Dual-State Architecture
@@ -83,9 +83,10 @@ VeriTask uses a **dual-state model**:
 | Layer | Storage | Purpose | Authority |
 |-------|---------|---------|-----------|
 | **On-Chain** | Stellar Soroban | Canonical escrow state, fund custody, role enforcement | Smart contract |
-| **Off-Chain** | localStorage | Task metadata, UI state, evidence text, demo data | Client app |
+| **Off-Chain** | Supabase PostgreSQL | Task metadata, milestones, evidence, agent assignments | App database |
+| **Fallback** | localStorage | Task data when Supabase unavailable | Client app |
 
-The on-chain layer is the source of truth for financial operations. The off-chain layer caches metadata for UX. Rehydration from on-chain (via `useGetEscrowsFromIndexerBySigner`) is available but not yet wired into the UI.
+The on-chain layer is the source of truth for financial operations. The off-chain layer (Supabase) stores task metadata and work evidence with cross-device sync. localStorage serves as a transparent fallback when Supabase is not configured.
 
 ---
 
@@ -592,8 +593,9 @@ Content-Type: application/json
 | Data | Location | Persistence | Scope |
 |------|----------|-------------|-------|
 | Wallet address + name | `localStorage` | Survives refresh | Per-browser |
-| Tasks + milestones | `localStorage` (`"veritask_tasks"`) | Survives refresh | Per-browser |
-| Task create form draft | `localStorage` (`"veritask_create_draft"`) | Optional banner to load | Per-browser |
+| Tasks + milestones + evidence | **Supabase PostgreSQL** | Persistent | Cross-device |
+| Tasks (fallback) | `localStorage` (`"veritask_tasks"`) | Survives refresh | Per-browser |
+| Task create form draft | `localStorage` (`"veritask_create_draft"`) | Optional banner | Per-browser |
 | Trustline setup flag | `localStorage` (`"veritask_setup_${address}"`) | Survives refresh | Per-wallet |
 | Escrow state | Stellar Soroban | On-chain | Permanent |
 | Transaction log | React state (`useState`) | Session only | Per-page |
@@ -603,27 +605,18 @@ Content-Type: application/json
 
 ### Store Operations (`src/lib/store.ts`)
 
-```typescript
-loadTasks(): Task[]                              // Read all tasks
-saveTasks(tasks: Task[]): void                   // Write all tasks
-getTask(id: string): Task | undefined            // Find by ID
-addTask(task: Task): void                        // Append new task
-updateTask(id: string, updates: Partial<Task>)   // Merge updates
-updateMilestone(taskId, milestoneId, updates)    // Update single milestone
-```
-
-All operations are synchronous and operate on the full task array. Tasks with `escrowContractId` exist on-chain; demo tasks (`src/lib/demo.ts`) have no contract ID and exist only for UI testing.
-
-### Force Update Pattern
-
-Several components use a `forceUpdate` counter pattern to trigger re-renders after localStorage mutations:
+All functions are **async** — they query Supabase first and fall back to localStorage transparently:
 
 ```typescript
-const [, forceUpdate] = useState(0);
-const refresh = () => forceUpdate((n) => n + 1);
+loadTasks(): Promise<Task[]>                      // Read all tasks (Supabase → localStorage)
+getTask(id: string): Promise<Task | undefined>    // Find by ID
+addTask(task: Task): Promise<void>                // Insert (Supabase → localStorage fallback)
+updateTask(id: string, updates: Partial<Task>)    // Merge updates
+updateMilestone(taskId, milestoneId, updates)     // Update single milestone in JSONB array
+deleteTask(id: string): Promise<void>             // Remove task
 ```
 
-This is necessary because localStorage is external to React's state system.
+Tasks with `escrowContractId` exist on-chain; demo tasks (`src/lib/demo.ts`) have no contract ID and exist only for UI testing.
 
 ---
 
@@ -644,10 +637,10 @@ This is necessary because localStorage is external to React's state system.
 |---------------|----------------------|--------------------------|
 | Wallet signing | Freighter / Albedo testnet | Same wallets, mainnet |
 | Escrow custody | Stellar Soroban smart contracts | Same |
-| Evidence storage | localStorage (text only) | IPFS / Pinata for proofs |
+| Evidence storage | Supabase PostgreSQL (text/JSONB) | IPFS / Pinata for proofs |
 | Verification integrity | Server-side SHA-256 hashing | Boundless ZK proofs |
 | API key | Client-side env var | Server-side only (proxy) |
-| Multi-user state | localStorage (single-device) | Supabase / backend DB |
+| Multi-user state | Supabase PostgreSQL + localStorage fallback | Same |
 
 ### Known Limitations (Development)
 
@@ -867,7 +860,7 @@ src/
 │   └── VerificationPanel.tsx             — Verification UI + results
 ├── lib/
 │   ├── types.ts                          — Core type definitions
-│   ├── store.ts                          — localStorage persistence
+│   ├── store.ts                          — Supabase + localStorage persistence
 │   ├── escrowService.ts                  — Escrow SDK wrapper
 │   ├── boundless.ts                      — BoundlessClient proof-request wrapper
 │   ├── supabase.ts                       — Supabase client (PostgreSQL)
